@@ -11,6 +11,9 @@ class FIXAdapter:
         self.target_comp_id = config.fix.target_comp_id
         self.SOH = "\x01"
         self.active_sessions = {}
+        self.session_socket = None
+        self.next_seq_num = 1
+        self.is_logged_in = False
 
     def __del__(self):
         self.cleanup_sessions()
@@ -20,7 +23,7 @@ class FIXAdapter:
             ("35", msg_type),
             ("49", self.sender_comp_id),
             ("56", self.target_comp_id),
-            ("34", "1"),
+            ("34", str(self.next_seq_num)),
             ("52", datetime.datetime.utcnow().strftime("%Y%m%d-%H:%M:%S.%f")[:-3]),
         ]
 
@@ -32,6 +35,7 @@ class FIXAdapter:
         checksum = sum(message_without_checksum.encode("ascii")) % 256
         checksum_str = str(checksum).zfill(3)
         
+        self.next_seq_num += 1
         return message_without_checksum + f"10={checksum_str}{self.SOH}"
 
     def parse_fix_response(self, response: str) -> dict:
@@ -120,15 +124,13 @@ class FIXAdapter:
             sock = self.create_ssl_socket(host, port, timeout)
 
             self.active_sessions[session_id] = sock
+            self.session_socket = sock
 
             sock.sendall(logon_message.encode("ascii"))
             response = sock.recv(4096).decode("ascii")
             
             if "35=A" in response:
-                time.sleep(0.5)
-                self.send_logout(sock, username)
-                sock.close()
-                del self.active_sessions[session_id]
+                self.is_logged_in = True
                 return True, None
             elif "35=5" in response:
                 fields = self.parse_fix_response(response)
@@ -155,3 +157,38 @@ class FIXAdapter:
             if session_id in self.active_sessions:
                 del self.active_sessions[session_id]
             return False, "Unknown Error occurred"
+
+    def is_session_active(self) -> bool:
+        """Check if the FIX session is active and healthy"""
+        return self.is_logged_in and self.session_socket is not None
+
+    def send_heartbeat(self) -> bool:
+        """Send a heartbeat message to keep the session alive"""
+        if not self.is_session_active():
+            return False
+
+        try:
+            heartbeat_message = self.create_fix_message("0", [])
+            self.session_socket.sendall(heartbeat_message.encode("ascii"))
+            return True
+        except Exception:
+            self.is_logged_in = False
+            return False
+
+    def logout(self) -> bool:
+        """Properly logout from the FIX session"""
+        if not self.is_session_active():
+            return True
+
+        try:
+            logout_fields = [("58", "User logout")]
+            logout_message = self.create_fix_message("5", logout_fields)
+            self.session_socket.sendall(logout_message.encode("ascii"))
+            
+            time.sleep(0.5)
+            self.session_socket.close()
+            self.is_logged_in = False
+            self.session_socket = None
+            return True
+        except Exception:
+            return False

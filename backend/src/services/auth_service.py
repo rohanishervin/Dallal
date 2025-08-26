@@ -3,12 +3,9 @@ from typing import Optional, Tuple
 from jose import jwt
 import uuid
 from src.config.settings import config
-from src.adapters.fix_adapter import FIXAdapter
+from src.services.session_manager import session_manager
 
 class AuthService:
-    def __init__(self):
-        self.fix_adapter = FIXAdapter()
-
     def generate_token(self, username: str) -> str:
         payload = {
             "sub": username,
@@ -22,18 +19,19 @@ class AuthService:
 
     async def authenticate_user(self, username: str, password: str, device_id: Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
         try:
-            success, error_message = self.fix_adapter.logon(
+            user_id = username
+            fix_session = await session_manager.get_or_create_session(
+                user_id=user_id,
                 username=username,
                 password=password,
-                device_id=device_id,
-                timeout=10
+                device_id=device_id
             )
 
-            if success:
+            if fix_session:
                 token = self.generate_token(username)
                 return True, token, None
             else:
-                return False, None, error_message
+                return False, None, "Authentication failed"
 
         except Exception as e:
             return False, None, "Authentication failed"
