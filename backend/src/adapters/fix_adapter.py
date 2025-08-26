@@ -42,17 +42,8 @@ class FIXAdapter:
                 fields[tag] = value
         return fields
 
-    def get_connection_params(self, use_ssl: Optional[bool] = None) -> Tuple[str, int, bool]:
-        should_use_ssl = config.fix.use_ssl if use_ssl is None else use_ssl
-        
-        if should_use_ssl:
-            host = config.fix.ssl_host
-            port = config.fix.ssl_port
-        else:
-            host = config.fix.nonssl_host
-            port = config.fix.nonssl_port
-
-        return host, port, should_use_ssl
+    def get_connection_params(self) -> Tuple[str, int]:
+        return config.fix.host, config.fix.port
 
     def create_ssl_socket(self, host: str, port: int, timeout: int):
         context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
@@ -94,7 +85,7 @@ class FIXAdapter:
         self.active_sessions = {}
 
     def logon(self, username: str, password: str, device_id: Optional[str] = None, 
-              timeout: int = 10, use_ssl: Optional[bool] = None) -> Tuple[bool, Optional[str]]:
+              timeout: int = 10) -> Tuple[bool, Optional[str]]:
         sock = None
         session_id = f"{username}"
 
@@ -108,7 +99,7 @@ class FIXAdapter:
                 except Exception:
                     pass
 
-            host, port, should_use_ssl = self.get_connection_params(use_ssl)
+            host, port = self.get_connection_params()
 
             logon_fields = [
                 ("98", "0"),
@@ -126,12 +117,7 @@ class FIXAdapter:
 
             logon_message = self.create_fix_message("A", logon_fields)
 
-            if should_use_ssl:
-                sock = self.create_ssl_socket(host, port, timeout)
-            else:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(timeout)
-                sock.connect((host, port))
+            sock = self.create_ssl_socket(host, port, timeout)
 
             self.active_sessions[session_id] = sock
 

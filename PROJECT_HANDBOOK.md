@@ -260,9 +260,10 @@ Authenticate user via FIX protocol and return JWT token.
 - **Credentials**: Enabled for authenticated requests
 
 #### SSL/TLS
-- **FIX Protocol**: TLSv1.2 with AES256-GCM-SHA384 cipher
+- **FIX Protocol**: SSL ONLY - TLSv1.2 with AES256-GCM-SHA384 cipher
 - **Certificate Verification**: Disabled for FIX (trading server requirement)
 - **HTTP API**: Always use HTTPS in production
+- **Security**: Non-SSL connections removed for enhanced security
 
 ### Rate Limiting
 - **Login Endpoint**: 5 attempts per minute per IP
@@ -276,6 +277,8 @@ Authenticate user via FIX protocol and return JWT token.
 # These MUST be set - application will fail to start without them
 FIX_SENDER_COMP_ID=your_actual_sender_id
 FIX_TARGET_COMP_ID=your_target_id
+FIX_HOST=your_fix_host
+FIX_PORT=5004
 JWT_SECRET=minimum-32-character-cryptographically-secure-secret
 ```
 
@@ -426,15 +429,12 @@ open http://localhost:8000/docs
 
 ### Environment Variables (.env file)
 ```env
-# FIX API Configuration (REQUIRED)
+# FIX API Configuration (REQUIRED - SSL ONLY)
 FIX_PROTOCOL_SPEC=FIX44
-FIX_USE_SSL=True
 FIX_SENDER_COMP_ID=your_sender_comp_id_here
 FIX_TARGET_COMP_ID=EXECUTOR
-FIX_SSL_HOST=your_fix_ssl_host_here
-FIX_SSL_PORT=5004
-FIX_NONSSL_HOST=your_fix_nonssl_host_here
-FIX_NONSSL_PORT=5002
+FIX_HOST=your_fix_host_here
+FIX_PORT=5004
 
 # JWT Configuration (REQUIRED - Generate secure 32+ character secret)
 JWT_SECRET=your-secure-32-plus-character-secret-key-here-change-in-production
@@ -453,9 +453,10 @@ DEBUG=False
 ### FIX Protocol Details
 - **Version**: FIX 4.4
 - **Message Types**: Logon (A), Logout (5)
-- **SSL Configuration**: TLSv1.2, AES256-GCM-SHA384 cipher
+- **SSL Configuration**: SSL ONLY - TLSv1.2, AES256-GCM-SHA384 cipher
 - **Session Management**: Automatic cleanup with proper logout
 - **Authentication**: Username/password via tags 553/554
+- **Security**: Non-SSL connections completely removed
 
 ---
 
@@ -464,14 +465,14 @@ DEBUG=False
 ### Common Issues
 
 **Connection Timeout**
-- Check FIX_SSL_HOST and FIX_SSL_PORT in .env
+- Check FIX_HOST and FIX_PORT in .env
 - Verify network connectivity to FIX server
 - Check if credentials are correct
 
 **SSL/Certificate Errors**
 - SSL context uses PROTOCOL_TLSv1_2 with certificate verification disabled
 - Cipher set to AES256-GCM-SHA384
-- If issues persist, try FIX_USE_SSL=False for non-SSL connection
+- All connections are SSL-only for security
 
 **Authentication Failed**
 - Verify FIX_SENDER_COMP_ID matches your account

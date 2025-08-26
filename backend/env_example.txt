@@ -1,12 +1,9 @@
-# FIX API Configuration (REQUIRED)
+# FIX API Configuration (REQUIRED - SSL ONLY)
 FIX_PROTOCOL_SPEC=FIX44
-FIX_USE_SSL=True
 FIX_SENDER_COMP_ID=your_sender_comp_id_here
 FIX_TARGET_COMP_ID=EXECUTOR
-FIX_SSL_HOST=your_fix_ssl_host_here
-FIX_SSL_PORT=5004
-FIX_NONSSL_HOST=your_fix_nonssl_host_here
-FIX_NONSSL_PORT=5002
+FIX_HOST=your_fix_host_here
+FIX_PORT=5004
 
 # JWT Configuration (REQUIRED - Generate secure 32+ character secret)
 JWT_SECRET=your-secure-32-plus-character-secret-key-here-change-in-production
