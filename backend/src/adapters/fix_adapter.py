@@ -9,7 +9,7 @@ class FIXAdapter:
     def __init__(self):
         self.sender_comp_id = config.fix.sender_comp_id
         self.target_comp_id = config.fix.target_comp_id
-        self.SOH = "\x01"
+        self.SOH = "\x01" # Field separator
         self.active_sessions = {}
         self.session_socket = None
         self.next_seq_num = 1
@@ -106,7 +106,7 @@ class FIXAdapter:
             host, port = self.get_connection_params()
 
             logon_fields = [
-                ("98", "0"),
+                ("98", "1"), # 98=1 means encryption is enabled
                 ("108", "30"),
                 ("141", "Y"),
                 ("553", username),
