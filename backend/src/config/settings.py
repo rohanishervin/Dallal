@@ -1,5 +1,8 @@
 from typing import Optional
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class FIXConfig:
     def __init__(self):

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
-import jwt
+from jose import jwt
 import uuid
 from src.config.settings import config
 from src.adapters.fix_adapter import FIXAdapter

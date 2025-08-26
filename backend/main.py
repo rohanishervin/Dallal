@@ -1,8 +1,13 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from src.routers.auth_router import router as auth_router
 from src.config.settings import config
+
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="FIX API Adapter",
@@ -10,6 +15,9 @@ app = FastAPI(
     version="1.0.0",
     debug=config.debug
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
