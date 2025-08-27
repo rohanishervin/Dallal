@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -6,7 +7,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from src.routers.auth_router import router as auth_router
 from src.routers.session_router import router as session_router
+from src.routers.market_router import router as market_router
 from src.config.settings import config
+
+logging.basicConfig(level=logging.INFO)
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -32,6 +36,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(session_router)
+app.include_router(market_router)
 
 @app.get("/")
 async def root():

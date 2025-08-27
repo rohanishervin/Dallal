@@ -4,13 +4,14 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from src.schemas.auth_schemas import LoginRequest, LoginResponse
 from src.services.auth_service import AuthService
+from src.config.settings import config
 
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["authentication"])
 auth_service = AuthService()
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit(config.rate_limit.login_rate_limit)
 async def login(request: Request, login_request: LoginRequest):
     success, token, error = await auth_service.authenticate_user(
         username=login_request.username,

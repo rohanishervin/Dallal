@@ -105,13 +105,16 @@ slowapi==0.1.9
 - [x] Error handling and proper session cleanup
 - [x] SSL/non-SSL connection support
 - [x] CORS middleware for frontend integration
+- [x] Persistent FIX session management
+- [x] Security List Request implementation (GET/POST /market/instruments)
+- [x] Market data foundation with proper parsing
 
 ### 🚧 Current Work
-- [ ] Testing login endpoint with real FIX credentials
-- [ ] Environment setup validation
+- [ ] Testing Security List Request with real FIX credentials
+- [ ] Implementing Market Data Request for real-time quotes
 
 ### 📋 Planned Features
-- [ ] Market data endpoints
+- [ ] Market Data Request (real-time streaming quotes)
 - [ ] Order management (place, cancel, modify orders)
 - [ ] WebSocket real-time feeds
 - [ ] Position tracking
@@ -212,10 +215,35 @@ Authenticate user via FIX protocol and return JWT token.
 { "status": "healthy" }
 ```
 
+### Market Data Endpoints
+
+#### GET /market/instruments
+Get list of available trading instruments via FIX Security List Request.
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "request_id": "SLR_1640995200000",
+  "response_id": "server_response_id",
+  "symbols": [
+    {
+      "symbol": "EUR/USD",
+      "security_id": "EURUSD",
+      "currency": "EUR", 
+      "settle_currency": "USD",
+      "trade_enabled": true,
+      "description": "Euro vs US Dollar"
+    }
+  ],
+  "message": "Retrieved 25 trading instruments",
+  "timestamp": "2023-12-01T10:30:00Z"
+}
+```
+
 ### Planned Endpoints
 
-#### Market Data
-- `GET /market/instruments` - List available instruments
+#### Market Data (Future)
 - `GET /market/quotes/{symbol}` - Get current quote
 - `WebSocket /ws/market` - Real-time market data
 
@@ -430,7 +458,7 @@ open http://localhost:8000/docs
 ### Environment Variables (.env file)
 ```env
 # FIX API Configuration (REQUIRED - SSL ONLY)
-FIX_PROTOCOL_SPEC=FIX44
+FIX_PROTOCOL_SPEC=ext.1.72
 FIX_SENDER_COMP_ID=your_sender_comp_id_here
 FIX_TARGET_COMP_ID=EXECUTOR
 FIX_HOST=your_fix_host_here

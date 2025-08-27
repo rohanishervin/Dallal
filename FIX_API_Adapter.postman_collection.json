@@ -1,0 +1,735 @@
+{
+	"info": {
+		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
+		"name": "FIX API Adapter - Complete Collection",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments)\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('message');",
+									"});",
+									"",
+									"// If login successful, save token",
+									"if (response.success && response.token) {",
+									"    pm.test(\"Login successful\", function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.token).to.be.a('string');",
+									"    });",
+									"    ",
+									"    // Save token to environment variable",
+									"    pm.environment.set(\"auth_token\", response.token);",
+									"    console.log(\"✅ Auth token saved:\", response.token.substring(0, 20) + \"...\");",
+									"} else {",
+									"    pm.test(\"Login failed as expected\", function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error).to.be.a('string');",
+									"    });",
+									"    console.log(\"❌ Login failed:\", response.error);",
+									"}",
+									"",
+									"// Log response for debugging",
+									"console.log(\"📋 Full response:\", JSON.stringify(response, null, 2));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Clear any existing token before login",
+									"pm.environment.unset(\"auth_token\");",
+									"console.log(\"🔄 Starting fresh login attempt...\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"device_id\": \"{{device_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticate user with FIX credentials and receive JWT token.\n\n**Rate Limited**: 5 attempts per minute per IP\n\n**Creates dual FIX sessions**:\n- Trade session (port 5004)\n- Feed session (port 5005)\n\n**Environment Variables Required**:\n- `username`: Your FIX trading username\n- `password`: Your FIX trading password\n- `device_id`: Optional device identifier"
+					},
+					"response": [
+						{
+							"name": "Successful Login",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"username\": \"trader123\",\n  \"password\": \"password123\",\n  \"device_id\": \"postman_testing\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0cmFkZXIxMjMiLCJpYXQiOjE2NDA5OTUyMDAuMCwiZXhwIjoxNjQwOTk4ODAwLjAsImp0aSI6IjEyMzQ1Njc4LTkwYWItY2RlZi0xMjM0LTU2Nzg5MGFiY2RlZiJ9.example_signature\",\n    \"message\": \"Login successful\"\n}"
+						},
+						{
+							"name": "Failed Login",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"username\": \"invalid\",\n  \"password\": \"wrong\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": false,\n    \"error\": \"Invalid credentials\",\n    \"message\": \"Login failed\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Authentication endpoints for user login and JWT token management."
+		},
+		{
+			"name": "📊 Session Management",
+			"item": [
+				{
+					"name": "Get Session Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('session');",
+									"    pm.expect(response).to.have.property('message');",
+									"});",
+									"",
+																	"// Test session object",
+								"pm.test(\"Session object is valid\", function () {",
+								"    pm.expect(response.session).to.have.property('user_id');",
+								"    pm.expect(response.session).to.have.property('overall_active');",
+								"});",
+								"",
+								"// Log session info",
+								"if (response.session.overall_active) {",
+								"    console.log(\"✅ Active sessions:\", response.message);",
+								"    ",
+								"    // Log Trade session details",
+								"    if (response.session.trade_session) {",
+								"        const trade = response.session.trade_session;",
+								"        console.log(\"📊 Trade Session:\");",
+								"        console.log(\"  - Active:\", trade.is_active);",
+								"        console.log(\"  - Age:\", trade.session_age_seconds, \"seconds\");",
+								"        console.log(\"  - Heartbeat:\", trade.heartbeat_status);",
+								"        console.log(\"  - Last heartbeat:\", trade.last_heartbeat || 'Never');",
+								"    }",
+								"    ",
+								"    // Log Feed session details",
+								"    if (response.session.feed_session) {",
+								"        const feed = response.session.feed_session;",
+								"        console.log(\"📈 Feed Session:\");",
+								"        console.log(\"  - Active:\", feed.is_active);",
+								"        console.log(\"  - Age:\", feed.session_age_seconds, \"seconds\");",
+								"        console.log(\"  - Heartbeat:\", feed.heartbeat_status);",
+								"        console.log(\"  - Last heartbeat:\", feed.last_heartbeat || 'Never');",
+								"    }",
+								"} else {",
+								"    console.log(\"❌ No active sessions found\");",
+								"}",
+								"",
+								"console.log(\"📋 Full session details:\", JSON.stringify(response.session, null, 2));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/session/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"session",
+								"status"
+							]
+						},
+						"description": "Get current session status including both Trade and Feed sessions.\n\n**Authentication Required**: JWT token in Authorization header\n\n**Returns**:\n- Session activity status\n- Creation time and last activity\n- Session age in seconds\n- Which sessions are active (Trade/Feed)"
+					},
+					"response": [
+						{
+							"name": "Active Sessions",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/session/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"session",
+										"status"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"session\": {\n        \"user_id\": \"trader123\",\n        \"overall_active\": true,\n        \"trade_session\": {\n            \"connection_type\": \"trade\",\n            \"is_active\": true,\n            \"created_at\": \"2023-12-01T10:30:00Z\",\n            \"last_activity\": \"2023-12-01T10:35:00Z\",\n            \"last_heartbeat\": \"2023-12-01T10:35:30Z\",\n            \"session_age_seconds\": 300,\n            \"heartbeat_status\": \"healthy\"\n        },\n        \"feed_session\": {\n            \"connection_type\": \"feed\",\n            \"is_active\": true,\n            \"created_at\": \"2023-12-01T10:30:05Z\",\n            \"last_activity\": \"2023-12-01T10:35:05Z\",\n            \"last_heartbeat\": \"2023-12-01T10:35:35Z\",\n            \"session_age_seconds\": 295,\n            \"heartbeat_status\": \"healthy\"\n        }\n    },\n    \"message\": \"Trade session active (heartbeat: healthy), Feed session active (heartbeat: healthy)\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout Session",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('message');",
+									"});",
+									"",
+									"// Test logout success",
+									"pm.test(\"Logout successful\", function () {",
+									"    pm.expect(response.success).to.be.true;",
+									"});",
+									"",
+									"console.log(\"🔓 Logout result:\", response.message);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/session/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"session",
+								"logout"
+							]
+						},
+						"description": "Logout and cleanup both Trade and Feed FIX sessions.\n\n**Authentication Required**: JWT token in Authorization header\n\n**Actions**:\n- Sends proper FIX logout messages\n- Closes SSL connections\n- Removes sessions from memory\n- Stops heartbeat monitoring"
+					},
+					"response": [
+						{
+							"name": "Successful Logout",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/session/logout",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"session",
+										"logout"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Trade session, Feed session logged out successfully\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Session management endpoints for monitoring and controlling FIX sessions."
+		},
+		{
+			"name": "📈 Market Data",
+			"item": [
+				{
+					"name": "Get Trading Instruments",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('request_id');",
+									"    pm.expect(response).to.have.property('symbols');",
+									"});",
+									"",
+									"// Test if request was successful",
+									"if (response.success) {",
+									"    pm.test(\"Security list retrieved successfully\", function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.symbols).to.be.an('array');",
+									"    });",
+									"    ",
+									"    console.log(\"✅ Retrieved\", response.symbols.length, \"trading instruments\");",
+									"    console.log(\"📊 Request ID:\", response.request_id);",
+									"    ",
+									"    // Log first few symbols",
+									"    if (response.symbols.length > 0) {",
+									"        console.log(\"📋 Sample instruments:\");",
+									"        response.symbols.slice(0, 5).forEach((symbol, index) => {",
+									"            console.log(`${index + 1}. ${symbol.symbol} - ${symbol.description || 'No description'}`);",
+									"        });",
+									"    }",
+									"} else {",
+									"    pm.test(\"Request failed as expected\", function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error).to.be.a('string');",
+									"    });",
+									"    console.log(\"❌ Request failed:\", response.error);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/market/instruments",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"market",
+								"instruments"
+							]
+						},
+						"description": "Get list of available trading instruments via FIX Security List Request.\n\n**Authentication Required**: JWT token in Authorization header\n\n**FIX Message**: Security List Request (x)\n**Connection Used**: Feed session (port 5005)\n\n**Returns**:\n- List of tradeable symbols\n- Symbol metadata (currency, description, etc.)\n- Request/response IDs for tracking"
+					},
+					"response": [
+						{
+							"name": "Successful Instruments List",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/market/instruments",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"market",
+										"instruments"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"request_id\": \"SLR_1640995200000\",\n    \"response_id\": \"server_response_id\",\n    \"symbols\": [\n        {\n            \"symbol\": \"EUR/USD\",\n            \"security_id\": \"EURUSD\",\n            \"currency\": \"EUR\",\n            \"settle_currency\": \"USD\",\n            \"trade_enabled\": true,\n            \"description\": \"Euro vs US Dollar\"\n        },\n        {\n            \"symbol\": \"GBP/USD\",\n            \"security_id\": \"GBPUSD\",\n            \"currency\": \"GBP\",\n            \"settle_currency\": \"USD\",\n            \"trade_enabled\": true,\n            \"description\": \"British Pound vs US Dollar\"\n        }\n    ],\n    \"message\": \"Retrieved 25 trading instruments\",\n    \"timestamp\": \"2023-12-01T10:30:00Z\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Market data endpoints for retrieving trading instruments and market information."
+		},
+		{
+			"name": "🏥 Health & System",
+			"item": [
+				{
+					"name": "Root Endpoint",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"API is running\", function () {",
+									"    pm.expect(response.message).to.include(\"running\");",
+									"});",
+									"",
+									"console.log(\"🚀 API Status:\", response.message);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Basic API status check - no authentication required."
+					},
+					"response": [
+						{
+							"name": "API Running",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"FIX API Adapter is running\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"Health status is healthy\", function () {",
+									"    pm.expect(response.status).to.eql(\"healthy\");",
+									"});",
+									"",
+									"console.log(\"💚 Health Status:\", response.status);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Health check endpoint for monitoring - no authentication required."
+					},
+					"response": [
+						{
+							"name": "Healthy",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/health",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"health"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"status\": \"healthy\"\n}"
+						}
+					]
+				},
+				{
+					"name": "API Documentation",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/docs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"docs"
+							]
+						},
+						"description": "FastAPI automatic documentation (Swagger UI) - opens in browser."
+					}
+				}
+			],
+			"description": "System health and documentation endpoints."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"console.log(\"🌐 Making request to:\", pm.request.url.toString());",
+					"",
+					"// Check if auth token exists for protected endpoints",
+					"const authToken = pm.environment.get(\"auth_token\");",
+					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\");",
+					"",
+					"if (isProtectedEndpoint && !authToken) {",
+					"    console.warn(\"⚠️  This endpoint requires authentication. Run the Login request first.\");",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"console.log(\"📡 Response received from:\", pm.request.url.toString());",
+					"console.log(\"📊 Response time:\", pm.response.responseTime + \"ms\");",
+					"console.log(\"📋 Response size:\", pm.response.responseSize + \" bytes\");",
+					"",
+					"// Test response time",
+					"pm.test(\"Response time is reasonable\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Test response format",
+					"pm.test(\"Response is JSON\", function () {",
+					"    pm.response.to.be.json;",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "username",
+			"value": "your_fix_username",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "your_fix_password",
+			"type": "string"
+		},
+		{
+			"key": "device_id",
+			"value": "postman_testing",
+			"type": "string"
+		}
+	]
+}

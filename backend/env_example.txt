@@ -1,9 +1,12 @@
 # FIX API Configuration (REQUIRED - SSL ONLY)
-FIX_PROTOCOL_SPEC=FIX44
+FIX_PROTOCOL_SPEC=ext.1.72
 FIX_SENDER_COMP_ID=your_sender_comp_id_here
 FIX_TARGET_COMP_ID=EXECUTOR
 FIX_HOST=your_fix_host_here
-FIX_PORT=5004
+# Feed server port (for market data, symbols, quotes)
+FIX_FEED_PORT=5003
+# Trade server port (for orders, positions, account info)
+FIX_TRADE_PORT=5004
 
 # JWT Configuration (REQUIRED - Generate secure 32+ character secret)
 JWT_SECRET=your-secure-32-plus-character-secret-key-here-change-in-production
@@ -15,3 +18,6 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 
 # Application Configuration
 DEBUG=False
+
+# Rate Limiting Configuration
+LOGIN_RATE_LIMIT=5/minute

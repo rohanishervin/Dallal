@@ -20,14 +20,25 @@ class AuthService:
     async def authenticate_user(self, username: str, password: str, device_id: Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
         try:
             user_id = username
-            fix_session = await session_manager.get_or_create_session(
+            
+            # Create BOTH Trade and Feed sessions during login
+            trade_session = await session_manager.get_or_create_session(
                 user_id=user_id,
                 username=username,
                 password=password,
-                device_id=device_id
+                device_id=device_id,
+                connection_type="trade"
+            )
+            
+            feed_session = await session_manager.get_or_create_session(
+                user_id=user_id,
+                username=username,
+                password=password,
+                device_id=device_id,
+                connection_type="feed"
             )
 
-            if fix_session:
+            if trade_session and feed_session:
                 token = self.generate_token(username)
                 return True, token, None
             else:
