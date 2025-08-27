@@ -99,3 +99,8 @@ env.txt
 Soft-FX FIX API 1.72.docx
 Soft-FX FIX API 1.72.pdf
 cursor-templates.md
+
+.pytest_cache/
+pytest-swagger.log
+pytest-swagger.log.*
+postman/
