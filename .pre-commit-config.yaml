@@ -1,0 +1,28 @@
+# Pre-commit configuration for FIX API Adapter
+repos:
+  - repo: local
+    hooks:
+      # Black code formatting with 120 character line length
+      - id: black
+        name: Black Code Formatter
+        entry: bash -c 'cd backend && source .venv/bin/activate && black --line-length 120 .'
+        language: system
+        types: [python]
+        pass_filenames: false
+        
+      # isort import sorting
+      - id: isort
+        name: isort Import Sorter
+        entry: bash -c 'cd backend && source .venv/bin/activate && isort .'
+        language: system
+        types: [python]
+        pass_filenames: false
+        
+      # Run tests to ensure code quality
+      - id: pytest
+        name: Run Tests
+        entry: bash -c 'cd backend && source .venv/bin/activate && PYTHONPATH=. pytest tests/ -v --tb=short'
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [commit]

@@ -498,12 +498,39 @@ JWT_SECRET=minimum-32-character-cryptographically-secure-secret
 
 ## Development Guidelines
 
-### Code Style
+### Code Style & Quality
+
+#### Automated Code Formatting
+The project uses pre-commit hooks to ensure consistent code quality:
+
+- **Black**: Code formatting with 120-character line length
+- **isort**: Import sorting and organization  
+- **pytest**: Automated testing before commits
+
+#### Code Standards
 - **No Python comments** (user preference)
 - Use type hints consistently
 - Follow clean architecture pattern
 - Minimal, focused changes
 - Use absolute paths in tool calls when possible
+
+#### Pre-commit Setup
+```bash
+# One-time setup (installs hooks and dependencies)
+./setup-pre-commit.sh
+
+# Manual hook execution (optional)
+cd backend && source .venv/bin/activate && pre-commit run --all-files
+
+# Bypass hooks if needed (not recommended)
+git commit --no-verify
+```
+
+The pre-commit hooks automatically:
+1. Format code with Black (120 char line length)
+2. Sort imports with isort
+3. Run all tests to ensure functionality
+4. Prevent commits if any step fails
 
 ### Adding New Features
 1. Create schema in `src/schemas/` (Pydantic models)
@@ -791,15 +818,22 @@ The application logs FIX protocol communication details. Check console output fo
 | `src/adapters/fix_adapter.py` | Complete FIX protocol implementation with SSL support |
 | `src/schemas/auth_schemas.py` | Pydantic models for login request/response |
 | `src/schemas/session_schemas.py` | Pydantic models for session status and logout |
+| `src/schemas/market_schemas.py` | Pydantic models for market data and instruments |
 | `src/services/auth_service.py` | Authentication business logic and JWT generation |
 | `src/services/session_manager.py` | FIX session lifecycle management and heartbeat monitoring |
+| `src/services/market_service.py` | Market data business logic and instrument parsing |
 | `src/routers/auth_router.py` | REST API endpoints for authentication |
 | `src/routers/session_router.py` | REST API endpoints for session management |
+| `src/routers/market_router.py` | REST API endpoints for market data |
 | `tests/test_auth.py` | Comprehensive authentication endpoint tests |
 | `tests/test_session.py` | Session management and lifecycle tests |
+| `tests/test_market.py` | Market data endpoint tests with field validation |
 | `tests/test_login.py` | Basic smoke test for login functionality |
 | `pytest.ini` | Pytest configuration for async testing |
-| `requirements.txt` | Python dependencies (includes testing packages) |
+| `pyproject.toml` | Black and isort configuration |
+| `.pre-commit-config.yaml` | Pre-commit hooks configuration |
+| `setup-pre-commit.sh` | Pre-commit setup script |
+| `requirements.txt` | Python dependencies (includes testing and dev packages) |
 | `env_example.txt` | Environment variables template |
 
 ---
