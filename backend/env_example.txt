@@ -21,3 +21,8 @@ DEBUG=False
 
 # Rate Limiting Configuration
 LOGIN_RATE_LIMIT=5/minute
+
+# Testing Configuration (Optional - for demo account testing)
+TEST_USERNAME=your_demo_username
+TEST_PASSWORD=your_demo_password
+TEST_DEVICE_ID=pytest_testing

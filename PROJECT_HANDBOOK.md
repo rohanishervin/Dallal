@@ -108,6 +108,9 @@ slowapi==0.1.9
 - [x] Persistent FIX session management
 - [x] Security List Request implementation (GET/POST /market/instruments)
 - [x] Market data foundation with proper parsing
+- [x] Comprehensive TDD framework with pytest and real FIX integration
+- [x] Session management endpoints (`/session/status`, `/session/logout`)
+- [x] Rate limiting configuration via environment variables
 
 ### 🚧 Current Work
 - [ ] Testing Security List Request with real FIX credentials
@@ -170,6 +173,58 @@ python main.py
 3. Include token in Authorization header for protected endpoints: `Authorization: Bearer <token>`
 
 ### Current Endpoints
+
+#### Session Management
+
+**GET /session/status**
+Get current session status for both trade and feed connections.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "session": {
+    "user_id": "224480013",
+    "overall_active": true,
+    "trade_session": {
+      "connection_type": "trade",
+      "is_active": true,
+      "session_age_seconds": 45.67,
+      "heartbeat_status": "healthy",
+      "last_heartbeat": "2023-12-01T10:30:15Z"
+    },
+    "feed_session": {
+      "connection_type": "feed", 
+      "is_active": true,
+      "session_age_seconds": 45.23,
+      "heartbeat_status": "healthy",
+      "last_heartbeat": "2023-12-01T10:30:14Z"
+    }
+  },
+  "message": "Session status retrieved successfully"
+}
+```
+
+**POST /session/logout**
+Logout and cleanup both FIX sessions.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "message": "Logout successful. Both trade and feed sessions have been terminated."
+}
+```
 
 #### Authentication
 
@@ -451,6 +506,139 @@ curl -X POST "http://localhost:8000/auth/login" \
 open http://localhost:8000/docs
 ```
 
+### TDD Framework
+
+#### Overview
+We use a comprehensive Test-Driven Development (TDD) approach with pytest to ensure all API endpoints work correctly with real FIX server integration. This prevents regressions during development.
+
+#### Test Architecture
+- **Real FIX Integration**: Tests use actual demo FIX accounts, not mocked servers
+- **Async Testing**: Full support for FastAPI's async operations
+- **Comprehensive Coverage**: Login, logout, session management, authentication flows
+- **Error Handling**: Tests cover success scenarios, validation errors, and edge cases
+
+#### Test Structure
+```
+backend/tests/
+├── test_auth.py        # Authentication endpoint tests
+├── test_session.py     # Session management tests  
+└── test_login.py       # Basic smoke test for login
+```
+
+#### Running Tests
+```bash
+# Navigate to backend directory
+cd backend
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run all tests
+PYTHONPATH=. pytest tests/ -v
+
+# Run specific test file
+PYTHONPATH=. pytest tests/test_auth.py -v
+
+# Run specific test
+PYTHONPATH=. pytest tests/test_auth.py::test_login_success -v
+```
+
+#### Test Configuration
+Environment variables for testing (add to `.env`):
+```env
+# Test Credentials (Demo FIX Account)
+TEST_USERNAME=your_demo_username
+TEST_PASSWORD=your_demo_password  
+TEST_DEVICE_ID=pytest_test
+```
+
+#### Test Categories
+
+**Authentication Tests** (`test_auth.py`):
+- ✅ Successful login with valid credentials
+- ✅ Invalid credentials handling
+- ✅ Missing field validation
+- ✅ Empty request body handling
+- ✅ Optional device_id parameter
+
+**Session Management Tests** (`test_session.py`):
+- ✅ Session status with authentication
+- ✅ Session status without authentication
+- ✅ Invalid token handling
+- ✅ Heartbeat tracking over time
+- ✅ Logout functionality
+- ✅ Multiple logout attempts
+- ✅ Session cleanup verification
+
+**Smoke Tests** (`test_login.py`):
+- ✅ Basic login functionality
+
+#### Key Testing Principles
+
+1. **Real Integration**: Uses actual FIX demo accounts for authentic testing
+2. **Async Support**: Proper handling of FastAPI's async operations
+3. **Event Loop Safety**: Fixed event loop closure issues in test cleanup
+4. **Comprehensive Coverage**: Tests cover happy paths, error cases, and edge scenarios
+5. **Environment Isolation**: Each test creates its own client instance
+6. **Session Lifecycle**: Full testing of login → session status → logout flow
+
+#### Test Results
+All tests currently pass (14 tests total):
+- 6 authentication tests
+- 7 session management tests  
+- 1 basic smoke test
+
+#### Adding New Tests
+
+When implementing new endpoints, follow this pattern:
+
+1. **Create test file** in `backend/tests/test_[feature].py`
+2. **Import dependencies**:
+   ```python
+   import pytest
+   from httpx import AsyncClient
+   import os
+   import sys
+   from dotenv import load_dotenv
+   
+   # Add parent directory to path
+   sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   from main import app
+   
+   # Load environment
+   load_dotenv(".env")
+   ```
+
+3. **Create helper functions** for authentication:
+   ```python
+   async def get_auth_token():
+       # Get JWT token for authenticated tests
+   ```
+
+4. **Write comprehensive tests**:
+   - Success scenarios with valid data
+   - Error scenarios with invalid data
+   - Authentication requirements
+   - Edge cases and boundary conditions
+
+5. **Use proper async patterns**:
+   ```python
+   @pytest.mark.asyncio
+   async def test_your_endpoint():
+       async with AsyncClient(app=app, base_url="http://test") as client:
+           response = await client.post("/your/endpoint", json=data)
+           assert response.status_code == 200
+   ```
+
+#### Benefits of Our TDD Approach
+- **Regression Prevention**: Catch breaking changes immediately
+- **Real-world Testing**: Using actual FIX servers ensures authenticity
+- **Development Confidence**: Safe refactoring and feature addition
+- **Documentation**: Tests serve as living documentation of API behavior
+- **CI/CD Ready**: Tests can be integrated into automated pipelines
+
+This TDD framework ensures robust, reliable development while maintaining the integrity of the FIX protocol integration.
+
 ---
 
 ## Configuration
@@ -474,6 +662,14 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 
 # Application Configuration
 DEBUG=False
+
+# Rate Limiting Configuration
+LOGIN_RATE_LIMIT=5/minute
+
+# Test Credentials (Demo FIX Account)
+TEST_USERNAME=your_demo_username
+TEST_PASSWORD=your_demo_password
+TEST_DEVICE_ID=pytest_test
 ```
 
 ⚠️ **Security Note**: The application will fail to start if required environment variables are not set. This prevents accidental deployment with default/insecure values.
@@ -561,12 +757,19 @@ The application logs FIX protocol communication details. Check console output fo
 | `src/config/settings.py` | Environment-based configuration management |
 | `src/adapters/fix_adapter.py` | Complete FIX protocol implementation with SSL support |
 | `src/schemas/auth_schemas.py` | Pydantic models for login request/response |
+| `src/schemas/session_schemas.py` | Pydantic models for session status and logout |
 | `src/services/auth_service.py` | Authentication business logic and JWT generation |
+| `src/services/session_manager.py` | FIX session lifecycle management and heartbeat monitoring |
 | `src/routers/auth_router.py` | REST API endpoints for authentication |
-| `requirements.txt` | Python dependencies |
+| `src/routers/session_router.py` | REST API endpoints for session management |
+| `tests/test_auth.py` | Comprehensive authentication endpoint tests |
+| `tests/test_session.py` | Session management and lifecycle tests |
+| `tests/test_login.py` | Basic smoke test for login functionality |
+| `pytest.ini` | Pytest configuration for async testing |
+| `requirements.txt` | Python dependencies (includes testing packages) |
 | `env_example.txt` | Environment variables template |
 
 ---
 
-*Last Updated: Initial creation with login functionality*
+*Last Updated: Added comprehensive TDD framework with session management and authentication tests*
 *Next Update: After implementing market data endpoints*

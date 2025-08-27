@@ -162,8 +162,21 @@ class SessionManager:
         
         # Stop heartbeat monitoring
         if session_key in self._heartbeat_tasks:
-            self._heartbeat_tasks[session_key].cancel()
-            del self._heartbeat_tasks[session_key]
+            try:
+                task = self._heartbeat_tasks[session_key]
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+            except RuntimeError:
+                # Event loop is closed, task cleanup will happen automatically
+                pass
+            finally:
+                # Remove from tracking regardless
+                if session_key in self._heartbeat_tasks:
+                    del self._heartbeat_tasks[session_key]
         
         # Clean up session from appropriate dictionary
         sessions_dict = self.trade_sessions if connection_type == "trade" else self.feed_sessions
