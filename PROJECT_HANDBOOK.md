@@ -273,7 +273,12 @@ Authenticate user via FIX protocol and return JWT token.
 ### Market Data Endpoints
 
 #### GET /market/instruments
-Get list of available trading instruments via FIX Security List Request.
+Get comprehensive list of available trading instruments via FIX Security List Request.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
 
 *Success Response:*
 ```json
@@ -284,14 +289,30 @@ Get list of available trading instruments via FIX Security List Request.
   "symbols": [
     {
       "symbol": "EUR/USD",
-      "security_id": "EURUSD",
+      "security_id": "Forex&1",
       "currency": "EUR", 
       "settle_currency": "USD",
       "trade_enabled": true,
-      "description": "Euro vs US Dollar"
+      "description": "Euro vs US Dollar",
+      "contract_multiplier": "100000.0",
+      "round_lot": "100000.0",
+      "min_trade_vol": "0.01",
+      "max_trade_volume": "1000.0",
+      "trade_vol_step": "0.01",
+      "px_precision": "5",
+      "currency_precision": "2",
+      "settl_currency_precision": "5",
+      "commission": "0",
+      "comm_type": "2",
+      "swap_type": "1",
+      "swap_size_short": "-0.002531",
+      "swap_size_long": "-0.003591",
+      "margin_factor_fractional": "1.0",
+      "default_slippage": "200",
+      "status_group_id": "Forex"
     }
   ],
-  "message": "Retrieved 25 trading instruments",
+  "message": "Retrieved 314 trading instruments",
   "timestamp": "2023-12-01T10:30:00Z"
 }
 ```
@@ -522,6 +543,7 @@ We use a comprehensive Test-Driven Development (TDD) approach with pytest to ens
 backend/tests/
 ├── test_auth.py        # Authentication endpoint tests
 ├── test_session.py     # Session management tests  
+├── test_market.py      # Market data endpoint tests
 └── test_login.py       # Basic smoke test for login
 ```
 
@@ -570,6 +592,16 @@ TEST_DEVICE_ID=pytest_test
 - ✅ Multiple logout attempts
 - ✅ Session cleanup verification
 
+**Market Data Tests** (`test_market.py`):
+- ✅ Get instruments with authentication
+- ✅ Get instruments without authentication (401)
+- ✅ Get instruments with invalid token (401)
+- ✅ Verify instruments data structure
+- ✅ Check EUR/USD symbol availability and completeness
+- ✅ Test field completeness across all instruments
+- ✅ Verify correct data types
+- ✅ Response time performance test
+
 **Smoke Tests** (`test_login.py`):
 - ✅ Basic login functionality
 
@@ -583,9 +615,10 @@ TEST_DEVICE_ID=pytest_test
 6. **Session Lifecycle**: Full testing of login → session status → logout flow
 
 #### Test Results
-All tests currently pass (14 tests total):
+All tests currently pass (22 tests total):
 - 6 authentication tests
-- 7 session management tests  
+- 7 session management tests
+- 8 market data tests  
 - 1 basic smoke test
 
 #### Adding New Tests

@@ -36,7 +36,50 @@ class MarketService:
                         currency=symbol_data.get("currency"),
                         settle_currency=symbol_data.get("settle_currency"),
                         trade_enabled=symbol_data.get("trade_enabled"),
-                        description=symbol_data.get("description")
+                        description=symbol_data.get("description"),
+                        
+                        # Trading parameters
+                        contract_multiplier=symbol_data.get("contract_multiplier"),
+                        round_lot=symbol_data.get("round_lot"),
+                        min_trade_vol=symbol_data.get("min_trade_vol"),
+                        max_trade_volume=symbol_data.get("max_trade_volume"),
+                        trade_vol_step=symbol_data.get("trade_vol_step"),
+                        px_precision=symbol_data.get("px_precision"),
+                        
+                        # Currency information
+                        currency_precision=symbol_data.get("currency_precision"),
+                        currency_sort_order=symbol_data.get("currency_sort_order"),
+                        settl_currency_precision=symbol_data.get("settl_currency_precision"),
+                        settl_currency_sort_order=symbol_data.get("settl_currency_sort_order"),
+                        
+                        # Commission and fees
+                        commission=symbol_data.get("commission"),
+                        comm_type=symbol_data.get("comm_type"),
+                        comm_charge_type=symbol_data.get("comm_charge_type"),
+                        comm_charge_method=symbol_data.get("comm_charge_method"),
+                        min_commission=symbol_data.get("min_commission"),
+                        min_commission_currency=symbol_data.get("min_commission_currency"),
+                        
+                        # Swap information
+                        swap_type=symbol_data.get("swap_type"),
+                        swap_size_short=symbol_data.get("swap_size_short"),
+                        swap_size_long=symbol_data.get("swap_size_long"),
+                        triple_swap_day=symbol_data.get("triple_swap_day"),
+                        
+                        # Margin and risk
+                        margin_factor_fractional=symbol_data.get("margin_factor_fractional"),
+                        stop_order_margin_reduction=symbol_data.get("stop_order_margin_reduction"),
+                        hidden_limit_order_margin_reduction=symbol_data.get("hidden_limit_order_margin_reduction"),
+                        
+                        # Display and grouping
+                        description_len=symbol_data.get("description_len"),
+                        encoded_security_desc_len=symbol_data.get("encoded_security_desc_len"),
+                        encoded_security_desc=symbol_data.get("encoded_security_desc"),
+                        default_slippage=symbol_data.get("default_slippage"),
+                        sort_order=symbol_data.get("sort_order"),
+                        group_sort_order=symbol_data.get("group_sort_order"),
+                        status_group_id=symbol_data.get("status_group_id"),
+                        close_only=symbol_data.get("close_only")
                     ))
                 
                 return SecurityListResponse(
