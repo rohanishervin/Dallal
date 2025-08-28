@@ -1,6 +1,7 @@
 import logging
 import time
-from typing import Dict, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
 from .fix_session_manager import FIXSessionManager
 
@@ -257,3 +258,203 @@ class FIXMarketData:
         except Exception as e:
             logger.error(f"Failed to parse security list response: {str(e)}")
             return {"error": f"Failed to parse security list response: {str(e)}"}
+
+    def send_market_history_request(
+        self,
+        symbol: str,
+        period_id: str,
+        max_bars: int,
+        end_time: datetime,
+        price_type: str = "B",
+        graph_type: str = "B",
+        request_id: str = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        if not self.session_manager.is_session_active():
+            logger.warning("Attempted market history request with inactive session")
+            return False, None, "FIX session not active"
+
+        try:
+            if not request_id:
+                request_id = f"MHR_{int(time.time() * 1000)}"
+
+            end_time_str = end_time.strftime("%Y%m%d-%H:%M:%S.%f")[:-3]
+
+            history_request_fields = [
+                ("10011", request_id),
+                ("55", symbol),
+                ("10035", str(-max_bars)),
+                ("10001", end_time_str),
+                ("10010", price_type),
+                ("10012", period_id),
+                ("10018", "G"),
+                ("10020", graph_type),
+            ]
+
+            request_message = self.session_manager.message_builder.create_fix_message("U1000", history_request_fields)
+            logger.info(
+                f"Sending market history request: {request_message.replace(self.session_manager.message_builder.SOH, '|')}"
+            )
+
+            if not self.session_manager.connection.send_message(request_message):
+                return False, None, "Failed to send request"
+
+            messages_received = []
+
+            while True:
+                try:
+                    response = self.session_manager.connection.recv_complete_fix_message(30)
+                    if not response:
+                        logger.error("Market history request timed out")
+                        logger.info(f"Messages received during request: {messages_received}")
+                        return False, None, "Request timed out - no Market History response received"
+
+                    msg_display = response.replace(self.session_manager.message_builder.SOH, "|")
+                    if len(msg_display) > 200:
+                        parsed_for_type = self.session_manager.message_builder.parse_fix_response(response)
+                        msg_type = parsed_for_type.get("35", "unknown")
+                        msg_display = f"MsgType={msg_type}, Length={len(response)}, Last50chars: ...{msg_display[-50:]}"
+                    logger.info(f"Received FIX response: {msg_display}")
+
+                    parsed_response = self.session_manager.message_builder.parse_fix_response(response)
+                    messages_received.append(parsed_response)
+
+                    msg_type = parsed_response.get("35")
+
+                    if msg_type == "U1002":
+                        logger.info("Received Market Data History (U1002) response")
+                        return True, self.parse_market_history_from_raw_message(response), None
+                    elif msg_type == "U1001":
+                        logger.warning("Received Market Data History Request Reject (U1001)")
+                        reject_reason = parsed_response.get("10021", "Unknown reason")
+                        error_text = parsed_response.get("58", "Market history request rejected")
+                        return (
+                            False,
+                            None,
+                            f"Request rejected: {error_text} (Reason code: {reject_reason})",
+                        )
+                    elif msg_type == "j":
+                        logger.warning("Received Business Message Reject (j)")
+                        error_msg = parsed_response.get("58", "Business message reject")
+                        reject_reason = parsed_response.get("380", "Unknown reason")
+                        ref_msg_type = parsed_response.get("372", "Unknown")
+                        return (
+                            False,
+                            None,
+                            f"Request rejected: {error_msg} (Reason: {reject_reason}, RefMsgType: {ref_msg_type})",
+                        )
+                    elif msg_type == "0":
+                        logger.info("Received Heartbeat (0), continuing to wait for Market History response...")
+                        continue
+                    elif msg_type == "1":
+                        logger.info("Received Test Request (1), sending Heartbeat response...")
+                        test_req_id = parsed_response.get("112")
+                        heartbeat_fields = [("112", test_req_id)] if test_req_id else []
+                        heartbeat_message = self.session_manager.message_builder.create_fix_message(
+                            "0", heartbeat_fields
+                        )
+                        self.session_manager.connection.send_message(heartbeat_message)
+                        continue
+                    else:
+                        logger.warning(f"Unexpected message type: {msg_type}, continuing to wait...")
+                        continue
+
+                except Exception as recv_error:
+                    logger.error(f"Error receiving message: {str(recv_error)}")
+                    return False, None, f"Receive error: {str(recv_error)}"
+
+        except Exception as e:
+            logger.error(f"Market history request failed: {str(e)}")
+            return False, None, f"Request failed: {str(e)}"
+
+    def parse_market_history_from_raw_message(self, raw_message: str) -> dict:
+        try:
+            SOH = self.session_manager.message_builder.SOH
+            response_fields = self.session_manager.message_builder.parse_fix_response(raw_message)
+
+            result = {
+                "request_id": response_fields.get("10011"),
+                "symbol": response_fields.get("55"),
+                "period_id": response_fields.get("10012"),
+                "price_type": response_fields.get("10010"),
+                "data_from": response_fields.get("10000"),
+                "data_to": response_fields.get("10001"),
+                "all_history_from": response_fields.get("10002"),
+                "all_history_to": response_fields.get("10003"),
+                "bars": [],
+            }
+
+            num_bars = int(response_fields.get("10004", "0"))
+            logger.info(f"Expected number of bars: {num_bars}")
+
+            fields = []
+            for field in raw_message.split(SOH):
+                if "=" in field:
+                    tag, value = field.split("=", 1)
+                    fields.append((tag, value))
+
+            bars = []
+            current_bar = {}
+            in_bar_group = False
+            fields_collected = set()
+
+            for tag, value in fields:
+                if tag in ["8", "9", "35", "34", "49", "52", "56"]:
+                    continue
+                elif tag in ["10011", "55", "10000", "10001", "10010", "10012", "10002", "10003"]:
+                    continue
+                elif tag == "10004":
+                    in_bar_group = True
+                    continue
+                elif tag in ["10068", "10"]:
+                    break
+
+                if not in_bar_group:
+                    continue
+
+                # Process bar data fields
+                if tag == "10005":
+                    current_bar["bar_hi"] = float(value)
+                    fields_collected.add("hi")
+                elif tag == "10006":
+                    current_bar["bar_low"] = float(value)
+                    fields_collected.add("low")
+                elif tag == "10007":
+                    current_bar["bar_open"] = float(value)
+                    fields_collected.add("open")
+                elif tag == "10008":
+                    current_bar["bar_close"] = float(value)
+                    fields_collected.add("close")
+                elif tag == "10009":
+                    current_bar["bar_time"] = value
+                    fields_collected.add("time")
+                elif tag == "10040":
+                    current_bar["bar_volume"] = int(value) if value else None
+                    fields_collected.add("volume")
+                elif tag == "10041":
+                    current_bar["bar_volume_ex"] = float(value) if value else None
+                    fields_collected.add("volume_ex")
+
+                # Check if we have all expected fields for a complete bar
+                # Wait for all 7 fields (including volume fields) before completing
+                required_fields = {"hi", "low", "open", "close", "time", "volume", "volume_ex"}
+                if required_fields.issubset(fields_collected):
+                    bars.append(current_bar.copy())
+                    current_bar = {}
+                    fields_collected = set()
+
+                    if len(bars) >= num_bars:
+                        break
+
+            result["bars"] = bars
+            logger.info(f"Parsed {len(bars)} bars from Market History response")
+
+            if bars:
+                logger.info(f"First bar example: {bars[0]}")
+                if len(bars) > 1:
+                    logger.info(f"Last bar example: {bars[-1]}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to parse market history response: {str(e)}")
+            return {"error": f"Failed to parse market history response: {str(e)}"}

@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
 		"name": "FIX API Adapter - Complete Collection",
-		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments)\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **Historical Bars**: Get OHLCV price data with configurable time periods\n- **Multiple timeframes**: Support for S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1\n- **Bid/Ask pricing**: Choose between Bid or Ask prices\n- **Comprehensive validation**: Proper error handling and data validation",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "12345678"
 	},
@@ -506,9 +506,288 @@
 							"body": "{\n    \"success\": true,\n    \"request_id\": \"SLR_1640995200000\",\n    \"response_id\": \"server_response_id\",\n    \"symbols\": [\n        {\n            \"symbol\": \"EUR/USD\",\n            \"security_id\": \"EURUSD\",\n            \"currency\": \"EUR\",\n            \"settle_currency\": \"USD\",\n            \"trade_enabled\": true,\n            \"description\": \"Euro vs US Dollar\"\n        },\n        {\n            \"symbol\": \"GBP/USD\",\n            \"security_id\": \"GBPUSD\",\n            \"currency\": \"GBP\",\n            \"settle_currency\": \"USD\",\n            \"trade_enabled\": true,\n            \"description\": \"British Pound vs US Dollar\"\n        }\n    ],\n    \"message\": \"Retrieved 25 trading instruments\",\n    \"timestamp\": \"2023-12-01T10:30:00Z\"\n}"
 						}
 					]
+				},
+				{
+					"name": "Get Historical Bars",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('symbol');",
+									"    pm.expect(response).to.have.property('period_id');",
+									"    pm.expect(response).to.have.property('bars');",
+									"});",
+									"",
+									"// Test if request was successful",
+									"if (response.success) {",
+									"    pm.test(\"Historical bars retrieved successfully\", function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.bars).to.be.an('array');",
+									"    });",
+									"    ",
+									"    console.log(\"✅ Retrieved\", response.bars.length, \"historical bars for\", response.symbol);",
+									"    console.log(\"📊 Period:\", response.period_id, \"| Price Type:\", response.price_type);",
+									"    console.log(\"📊 Request ID:\", response.request_id || 'Not provided');",
+									"    ",
+									"    // Log date range if available",
+									"    if (response.data_from && response.data_to) {",
+									"        console.log(\"📅 Data Range: \", response.data_from, \"to\", response.data_to);",
+									"    }",
+									"    ",
+									"    // Log first few bars",
+									"    if (response.bars.length > 0) {",
+									"        console.log(\"📋 Sample bars:\");",
+									"        response.bars.slice(0, 3).forEach((bar, index) => {",
+									"            console.log(`${index + 1}. ${bar.timestamp}: O=${bar.open_price} H=${bar.high_price} L=${bar.low_price} C=${bar.close_price}`);",
+									"        });",
+									"        ",
+									"        // Validate bar structure",
+									"        pm.test(\"Bar data structure is valid\", function () {",
+									"            const firstBar = response.bars[0];",
+									"            pm.expect(firstBar).to.have.property('timestamp');",
+									"            pm.expect(firstBar).to.have.property('open_price');",
+									"            pm.expect(firstBar).to.have.property('high_price');",
+									"            pm.expect(firstBar).to.have.property('low_price');",
+									"            pm.expect(firstBar).to.have.property('close_price');",
+									"        });",
+									"    }",
+									"} else {",
+									"    pm.test(\"Request failed as expected\", function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error).to.be.a('string');",
+									"    });",
+									"    console.log(\"❌ Request failed:\", response.error);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"timeframe\": \"H1\",\n  \"count\": 50,\n  \"price_type\": \"B\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/market/history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"market",
+								"history"
+							]
+						},
+						"description": "Get historical price bars from current time going back in history.\n\n**Authentication Required**: JWT token in Authorization header\n\n**How it works**: Gets current open candle + historical bars going backwards\n\n**Request Parameters**:\n- `symbol` (required): Currency pair (e.g., EUR/USD)\n- `timeframe` (required): S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1\n- `count` (required): Number of bars to retrieve (1-10000)\n- `to_time` (optional): End time for data (defaults to now)\n- `price_type` (optional): \"A\" for Ask, \"B\" for Bid (default: B)\n\n**Examples**:\n- Get last 50 hourly bars: `{\"symbol\": \"EUR/USD\", \"timeframe\": \"H1\", \"count\": 50}`\n- Get last 100 5-min bars: `{\"symbol\": \"EUR/USD\", \"timeframe\": \"M5\", \"count\": 100}`\n\n**Returns**: Array of OHLCV bars with most recent first"
+					},
+					"response": [
+						{
+							"name": "Historical Bars - Previous Day",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"timeframe\": \"H1\",\n  \"count\": 24,\n  \"to_time\": \"2025-08-27T23:59:59.000000\",\n  \"price_type\": \"B\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/market/history",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"market",
+										"history"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"request_id\": \"MHR_1756367918500\",\n    \"symbol\": \"EUR/USD\",\n    \"timeframe\": \"H1\",\n    \"price_type\": \"B\",\n    \"from_time\": \"2025-08-27T00:00:00.000000\",\n    \"to_time\": \"2025-08-27T23:00:00.000000\",\n    \"bars\": [\n        {\n            \"timestamp\": \"2025-08-27T23:00:00.000000\",\n            \"open_price\": 1.08945,\n            \"high_price\": 1.08997,\n            \"low_price\": 1.08923,\n            \"close_price\": 1.08976,\n            \"volume\": 1234,\n            \"volume_ex\": 1234.56\n        },\n        {\n            \"timestamp\": \"2025-08-27T22:00:00.000000\",\n            \"open_price\": 1.08912,\n            \"high_price\": 1.08955,\n            \"low_price\": 1.08901,\n            \"close_price\": 1.08945,\n            \"volume\": 987,\n            \"volume_ex\": 987.65\n        }\n    ],\n    \"message\": \"Retrieved 24 historical bars for EUR/USD\",\n    \"timestamp\": \"2025-08-28T07:58:38.591062\"\n}"
+						},
+						{
+							"name": "Successful Historical Bars",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"period_id\": \"H1\",\n  \"max_bars\": 50,\n  \"end_time\": \"2023-12-01T15:30:00.000000\",\n  \"price_type\": \"B\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/market/history",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"market",
+										"history"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"request_id\": \"MHR_1640995200000\",\n    \"symbol\": \"EUR/USD\",\n    \"period_id\": \"H1\",\n    \"price_type\": \"B\",\n    \"data_from\": \"2023-11-28T10:00:00.000000\",\n    \"data_to\": \"2023-12-01T15:00:00.000000\",\n    \"all_history_from\": \"2020-01-01T00:00:00.000000\",\n    \"all_history_to\": \"2023-12-01T15:30:00.000000\",\n    \"bars\": [\n        {\n            \"timestamp\": \"2023-12-01T14:00:00.000000\",\n            \"open_price\": 1.08945,\n            \"high_price\": 1.08997,\n            \"low_price\": 1.08923,\n            \"close_price\": 1.08976,\n            \"volume\": 1234,\n            \"volume_ex\": 1234.56\n        },\n        {\n            \"timestamp\": \"2023-12-01T13:00:00.000000\",\n            \"open_price\": 1.08912,\n            \"high_price\": 1.08955,\n            \"low_price\": 1.08901,\n            \"close_price\": 1.08945,\n            \"volume\": 987,\n            \"volume_ex\": 987.65\n        }\n    ],\n    \"message\": \"Retrieved 50 historical bars for EUR/USD\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\"\n}"
+						},
+						{
+							"name": "Invalid Symbol Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"INVALID/SYMBOL\",\n  \"period_id\": \"H1\",\n  \"max_bars\": 10,\n  \"end_time\": \"2023-12-01T15:30:00.000000\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/market/history",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"market",
+										"history"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Failed to retrieve historical bars\",\n    \"error\": \"Request rejected: unknown symbol (Reason code: 1)\"\n}"
+						},
+						{
+							"name": "Validation Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"period_id\": \"INVALID\",\n  \"max_bars\": 50000\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/market/history",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"market",
+										"history"
+									]
+								}
+							},
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"detail\": [\n        {\n            \"loc\": [\"body\", \"period_id\"],\n            \"msg\": \"value is not a valid enumeration member; permitted: 'S1', 'S10', 'M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN1'\",\n            \"type\": \"type_error.enum\"\n        },\n        {\n            \"loc\": [\"body\", \"max_bars\"],\n            \"msg\": \"ensure this value is less than or equal to 10000\",\n            \"type\": \"value_error.number.not_le\"\n        }\n    ]\n}"
+						}
+					]
 				}
 			],
-			"description": "Market data endpoints for retrieving trading instruments and market information."
+			"description": "Market data endpoints for retrieving trading instruments, historical bars, and market information."
 		},
 		{
 			"name": "🏥 Health & System",

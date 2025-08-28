@@ -1,7 +1,8 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class SecurityInfo(BaseModel):
@@ -63,6 +64,75 @@ class SecurityListResponse(BaseModel):
     request_id: Optional[str] = Field(None, description="Request identifier")
     response_id: Optional[str] = Field(None, description="Server response identifier")
     symbols: List[SecurityInfo] = Field(default_factory=list, description="List of available trading instruments")
+    message: str = Field(..., description="Response message")
+    error: Optional[str] = Field(None, description="Error message if request failed")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
+
+
+class PeriodID(str, Enum):
+    S1 = "S1"
+    S10 = "S10"
+    M1 = "M1"
+    M5 = "M5"
+    M15 = "M15"
+    M30 = "M30"
+    H1 = "H1"
+    H4 = "H4"
+    D1 = "D1"
+    W1 = "W1"
+    MN1 = "MN1"
+
+
+class PriceType(str, Enum):
+    ASK = "A"
+    BID = "B"
+
+
+class GraphType(str, Enum):
+    BARS = "B"
+    TICKS_BEST = "T"
+    TICKS_FULL = "L"
+
+
+class HistoricalBarsRequest(BaseModel):
+    symbol: str = Field(..., description="Currency pair symbol (e.g., EUR/USD)")
+    timeframe: PeriodID = Field(..., description="Time period for bars (M1, M5, M15, M30, H1, H4, D1, etc.)")
+    count: int = Field(..., ge=1, le=10000, description="Number of bars to retrieve (1-10000)")
+    to_time: Optional[datetime] = Field(None, description="End time for data (defaults to now)")
+    price_type: PriceType = Field(PriceType.BID, description="Price type (Ask or Bid)")
+
+    @validator("symbol")
+    def validate_symbol(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError("Symbol cannot be empty")
+        return v.strip().upper()
+
+    @validator("to_time", pre=True, always=True)
+    def set_default_to_time(cls, v):
+        if v is None:
+            return datetime.utcnow()
+        return v
+
+
+class HistoricalBar(BaseModel):
+    timestamp: datetime = Field(..., description="Bar timestamp")
+    open_price: float = Field(..., description="Opening price")
+    high_price: float = Field(..., description="Highest price")
+    low_price: float = Field(..., description="Lowest price")
+    close_price: float = Field(..., description="Closing price")
+    volume: Optional[int] = Field(None, description="Volume (integer representation)")
+    volume_ex: Optional[float] = Field(None, description="Volume (float representation)")
+
+
+class HistoricalBarsResponse(BaseModel):
+    success: bool = Field(..., description="Whether the request was successful")
+    request_id: Optional[str] = Field(None, description="Request identifier")
+    symbol: str = Field(..., description="Currency pair symbol")
+    timeframe: PeriodID = Field(..., description="Time period for bars")
+    price_type: PriceType = Field(..., description="Price type (Ask or Bid)")
+    from_time: Optional[datetime] = Field(None, description="Start time of returned data")
+    to_time: Optional[datetime] = Field(None, description="End time of returned data")
+    bars: List[HistoricalBar] = Field(default_factory=list, description="Historical price bars")
     message: str = Field(..., description="Response message")
     error: Optional[str] = Field(None, description="Error message if request failed")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")

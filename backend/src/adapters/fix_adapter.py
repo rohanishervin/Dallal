@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Optional, Tuple
 
 from .fix_market_data import FIXMarketData
@@ -38,6 +39,20 @@ class FIXAdapter:
 
     def send_security_list_request(self, request_id: str = None) -> Tuple[bool, Optional[dict], Optional[str]]:
         return self.market_data.send_security_list_request(request_id)
+
+    def send_market_history_request(
+        self,
+        symbol: str,
+        period_id: str,
+        max_bars: int,
+        end_time: datetime,
+        price_type: str = "B",
+        graph_type: str = "B",
+        request_id: str = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        return self.market_data.send_market_history_request(
+            symbol, period_id, max_bars, end_time, price_type, graph_type, request_id
+        )
 
     def parse_security_list_response(self, response_fields: dict) -> dict:
         return self.market_data.parse_security_list_response(response_fields)

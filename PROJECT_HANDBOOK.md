@@ -112,8 +112,12 @@ slowapi==0.1.9
 - [x] Session management endpoints (`/session/status`, `/session/logout`)
 - [x] Rate limiting configuration via environment variables
 
+- [x] Historical bars endpoint (`POST /market/history`) with comprehensive testing
+- [x] FIX Market Data History Request (U1000) implementation  
+- [x] Historical bar data parsing and validation
+
 ### 🚧 Current Work
-- [ ] Testing Security List Request with real FIX credentials
+- [ ] Testing historical bars endpoint with real FIX credentials
 - [ ] Implementing Market Data Request for real-time quotes
 
 ### 📋 Planned Features
@@ -314,6 +318,78 @@ Authorization: Bearer <jwt_token>
   ],
   "message": "Retrieved 314 trading instruments",
   "timestamp": "2023-12-01T10:30:00Z"
+}
+```
+
+#### POST /market/history
+Get historical price bars for a specified symbol and time period via FIX Market Data History Request.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "period_id": "H1",
+  "max_bars": 100,
+  "end_time": "2023-12-01T15:30:00.000000",
+  "price_type": "B",
+  "graph_type": "B"
+}
+```
+
+*Request Parameters:*
+- `symbol` (required): Currency pair symbol (e.g., "EUR/USD")
+- `timeframe` (required): Time period - S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1
+- `count` (required): Number of bars to retrieve (1-10000)
+- `to_time` (optional): End time for data, defaults to current time
+- `price_type` (optional): "A" for Ask, "B" for Bid (default: "B")
+
+**How It Works:**
+- The API automatically requests bars **going backwards** from the specified time
+- Uses negative `HstReqBars` value internally to get historical data from the FIX server
+- Returns most recent bars first, going back in time
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "request_id": "MHR_1640995200000",
+  "symbol": "EUR/USD",
+  "timeframe": "H1",
+  "price_type": "B",
+  "from_time": "2023-11-28T10:00:00.000000",
+  "to_time": "2023-12-01T15:00:00.000000",
+  "bars": [
+    {
+      "timestamp": "2023-12-01T15:00:00.000000",
+      "open_price": 1.08945,
+      "high_price": 1.08997,
+      "low_price": 1.08923,
+      "close_price": 1.08976,
+      "volume": 1234,
+      "volume_ex": 1234.56
+    }
+  ],
+  "message": "Retrieved 96 historical bars for EUR/USD",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+*Error Response:*
+```json
+{
+  "success": false,
+  "symbol": "INVALID/SYMBOL",
+  "timeframe": "H1",
+  "price_type": "B",
+  "message": "Failed to retrieve historical bars",
+  "error": "Request rejected: unknown symbol (Reason code: 1)",
+  "bars": [],
+  "timestamp": "2023-12-01T15:30:00Z"
 }
 ```
 
@@ -629,6 +705,20 @@ TEST_DEVICE_ID=pytest_test
 - ✅ Verify correct data types
 - ✅ Response time performance test
 
+**Historical Bars Tests** (`test_history.py`):
+- ✅ Get historical bars with authentication
+- ✅ Test different time periods (M1, M5, M15, H1, D1)
+- ✅ Test different price types (Bid/Ask)
+- ✅ Authentication validation (403 without token)
+- ✅ Invalid token handling (401)
+- ✅ Request validation errors (422)
+- ✅ Invalid symbol handling (400)
+- ✅ Boundary value testing (min/max bars)
+- ✅ Response structure validation
+- ✅ Performance testing (30s timeout)
+- ✅ Request without to_time (defaults to now)
+- ✅ Multiple bars retrieval (verifying negative bars logic)
+
 **Smoke Tests** (`test_login.py`):
 - ✅ Basic login functionality
 
@@ -642,10 +732,11 @@ TEST_DEVICE_ID=pytest_test
 6. **Session Lifecycle**: Full testing of login → session status → logout flow
 
 #### Test Results
-All tests currently pass (22 tests total):
+All tests currently pass (33 tests total):
 - 6 authentication tests
 - 7 session management tests
 - 8 market data tests  
+- 11 historical bars tests
 - 1 basic smoke test
 
 #### Adding New Tests
@@ -828,6 +919,7 @@ The application logs FIX protocol communication details. Check console output fo
 | `tests/test_auth.py` | Comprehensive authentication endpoint tests |
 | `tests/test_session.py` | Session management and lifecycle tests |
 | `tests/test_market.py` | Market data endpoint tests with field validation |
+| `tests/test_history.py` | Historical bars endpoint tests with comprehensive coverage |
 | `tests/test_login.py` | Basic smoke test for login functionality |
 | `pytest.ini` | Pytest configuration for async testing |
 | `pyproject.toml` | Black and isort configuration |
@@ -838,5 +930,5 @@ The application logs FIX protocol communication details. Check console output fo
 
 ---
 
-*Last Updated: Added comprehensive TDD framework with session management and authentication tests*
-*Next Update: After implementing market data endpoints*
+*Last Updated: Added historical bars endpoint with FIX Market Data History Request (U1000) implementation*
+*Next Update: After implementing real-time market data streaming*
