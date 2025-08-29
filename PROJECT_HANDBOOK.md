@@ -31,7 +31,29 @@ Modern REST and WebSocket API layer built on top of FIX protocol for trading app
 - **Schemas**: Pydantic models for request/response validation
 - **Routers**: FastAPI endpoints handling HTTP requests
 - **Services**: Business logic and orchestration
-- **Adapters**: External service communication (FIX protocol)
+- **Adapters**: External service communication (FIX protocol via QuickFIX)
+
+### QuickFIX Architecture with Process Isolation
+**Pattern**: FastAPI → Process Adapter → Process Manager → QuickFIX Service → FIX Server
+
+#### **Why Process Isolation?**
+The original custom FIX implementation caused segmentation faults due to threading conflicts between QuickFIX's internal C++ threads and FastAPI's async event loop. Process isolation solves this by running QuickFIX in separate processes.
+
+#### **Architecture Components:**
+1. **ProcessFIXAdapter**: Main interface that services use (replaces old FIXAdapter)
+2. **FIXProcessManager**: Manages lifecycle of separate FIX processes
+3. **FIXServiceRunner**: Runs in separate process with QuickFIX implementation
+4. **QuickFIX Adapters**: Trade and Feed adapters using quickfix-ssl library
+
+#### **Message Flow:**
+```
+User Request → FastAPI → ProcessFIXAdapter → FIXProcessManager → 
+FIXServiceRunner (separate process) → QuickFIX Adapter → FIX Server
+```
+
+#### **Session Types:**
+- **Trade Sessions**: Handle orders, positions, account info (port: FIX_TRADE_PORT)
+- **Feed Sessions**: Handle market data, security lists, historical data (port: FIX_FEED_PORT)
 
 ### Key Principles
 - **Minimal Changes**: Prefer small, focused modifications
@@ -48,7 +70,8 @@ Modern REST and WebSocket API layer built on top of FIX protocol for trading app
 - **Python Management**: uv (not pip/pipenv)
 - **Dependencies**: requirements.txt (not pyproject.toml)
 - **Authentication**: JWT tokens after FIX login
-- **Protocol**: FIX 4.4 over SSL/TCP
+- **Protocol**: FIX 4.4 over SSL/TCP using quickfix-ssl library
+- **Architecture**: Process-isolated QuickFIX sessions for thread safety
 
 ### Frontend (Planned)
 - **Framework**: Next.js
@@ -63,6 +86,7 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
 websockets==12.0
 slowapi==0.1.9
+quickfix-ssl==1.15.1
 ```
 
 ---
@@ -76,11 +100,19 @@ slowapi==0.1.9
 │   ├── main.py                   # FastAPI app entry point
 │   ├── requirements.txt          # Python dependencies
 │   ├── env_example.txt          # Environment template
+│   ├── trade_session.cfg        # QuickFIX trade session configuration
+│   ├── feed_session.cfg         # QuickFIX feed session configuration
+│   ├── FIX44 ext.1.72.xml      # QuickFIX data dictionary
 │   └── src/
 │       ├── config/
 │       │   └── settings.py      # Configuration management
 │       ├── adapters/
-│       │   └── fix_adapter.py   # FIX protocol implementation
+│       │   ├── quickfix_trade_adapter.py    # QuickFIX trade operations
+│       │   ├── quickfix_feed_adapter.py     # QuickFIX market data operations
+│       │   ├── process_fix_adapter.py       # Process isolation wrapper
+│       │   ├── fix_process_manager.py       # Process lifecycle management
+│       │   ├── fix_service_runner.py        # Process service runner
+│       │   └── quickfix_config.py           # QuickFIX configuration management
 │       ├── schemas/
 │       │   └── auth_schemas.py  # Request/response models
 │       ├── services/
@@ -98,12 +130,15 @@ slowapi==0.1.9
 
 ### ✅ Completed Features
 - [x] Backend structure with FastAPI
+- [x] **Migration to QuickFIX-ssl library completed**
+- [x] **Process isolation architecture implemented for thread safety**
+- [x] **Dual FIX session support (Trade + Feed)**
 - [x] FIX protocol adapter (login functionality)
 - [x] Authentication service with JWT token generation
 - [x] REST API endpoint: `POST /auth/login`
 - [x] Configuration management via environment variables
 - [x] Error handling and proper session cleanup
-- [x] SSL/non-SSL connection support
+- [x] SSL/TLS connection support (TLSv1.2, AES256-GCM-SHA384)
 - [x] CORS middleware for frontend integration
 - [x] Persistent FIX session management
 - [x] Security List Request implementation (GET/POST /market/instruments)
@@ -111,14 +146,16 @@ slowapi==0.1.9
 - [x] Comprehensive TDD framework with pytest and real FIX integration
 - [x] Session management endpoints (`/session/status`, `/session/logout`)
 - [x] Rate limiting configuration via environment variables
-
 - [x] Historical bars endpoint (`POST /market/history`) with comprehensive testing
 - [x] FIX Market Data History Request (U1000) implementation  
 - [x] Historical bar data parsing and validation
+- [x] **QuickFIX configuration management with external .cfg files**
+- [x] **Process lifecycle management and monitoring**
 
 ### 🚧 Current Work
-- [ ] Testing historical bars endpoint with real FIX credentials
+- [ ] Testing the new QuickFIX architecture with real FIX credentials
 - [ ] Implementing Market Data Request for real-time quotes
+- [ ] Optimizing process isolation performance
 
 ### 📋 Planned Features
 - [ ] Market Data Request (real-time streaming quotes)
@@ -826,12 +863,23 @@ TEST_DEVICE_ID=pytest_test
 ⚠️ **Security Note**: The application will fail to start if required environment variables are not set. This prevents accidental deployment with default/insecure values.
 
 ### FIX Protocol Details
-- **Version**: FIX 4.4
-- **Message Types**: Logon (A), Logout (5)
+- **Version**: FIX 4.4 with Soft-FX extensions (ext.1.72)
+- **Library**: quickfix-ssl (enterprise-grade SSL support)
+- **Message Types**: Logon (A), Logout (5), Security List (x), Market Data History (U1000)
 - **SSL Configuration**: SSL ONLY - TLSv1.2, AES256-GCM-SHA384 cipher
 - **Session Management**: Automatic cleanup with proper logout
 - **Authentication**: Username/password via tags 553/554
 - **Security**: Non-SSL connections completely removed
+
+### QuickFIX Implementation Details
+- **Data Dictionary**: Uses `FIX44 ext.1.72.xml` for message parsing and validation
+- **Configuration**: External `.cfg` files for session settings (trade_session.cfg, feed_session.cfg)
+- **Process Isolation**: Each user gets separate processes for trade vs feed operations
+- **Communication**: Inter-process communication via multiprocessing.Queue
+- **Session Types**: 
+  - **Trade**: Orders, positions, account management (port: FIX_TRADE_PORT)
+  - **Feed**: Market data, security lists, historical data (port: FIX_FEED_PORT)
+- **Logging**: QuickFIX logs stored in `backend/logs/` directory
 
 ---
 
@@ -906,7 +954,15 @@ The application logs FIX protocol communication details. Check console output fo
 |------|---------|
 | `main.py` | FastAPI application entry point with CORS and route registration |
 | `src/config/settings.py` | Environment-based configuration management |
-| `src/adapters/fix_adapter.py` | Complete FIX protocol implementation with SSL support |
+| `trade_session.cfg` | QuickFIX trade session configuration template |
+| `feed_session.cfg` | QuickFIX feed session configuration template |
+| `FIX44 ext.1.72.xml` | QuickFIX data dictionary for Soft-FX protocol |
+| `src/adapters/quickfix_trade_adapter.py` | QuickFIX trade operations implementation |
+| `src/adapters/quickfix_feed_adapter.py` | QuickFIX market data operations implementation |
+| `src/adapters/process_fix_adapter.py` | Process isolation wrapper for services |
+| `src/adapters/fix_process_manager.py` | Process lifecycle management and monitoring |
+| `src/adapters/fix_service_runner.py` | Process service runner for QuickFIX operations |
+| `src/adapters/quickfix_config.py` | QuickFIX configuration management |
 | `src/schemas/auth_schemas.py` | Pydantic models for login request/response |
 | `src/schemas/session_schemas.py` | Pydantic models for session status and logout |
 | `src/schemas/market_schemas.py` | Pydantic models for market data and instruments |
@@ -930,5 +986,5 @@ The application logs FIX protocol communication details. Check console output fo
 
 ---
 
-*Last Updated: Added historical bars endpoint with FIX Market Data History Request (U1000) implementation*
+*Last Updated: Migrated to QuickFIX-ssl library with process isolation architecture for thread safety*
 *Next Update: After implementing real-time market data streaming*
