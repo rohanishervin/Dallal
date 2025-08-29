@@ -6,107 +6,14 @@ from typing import Dict, Optional, Tuple
 
 import quickfix as fix
 
-from src.config.settings import config
-
-from .quickfix_config import QuickFIXConfigManager
+from .quickfix_base_adapter import FIXMessageParser, QuickFIXBaseAdapter
 
 logger = logging.getLogger(__name__)
 
 
-class QuickFIXTradeAdapter(fix.Application):
+class QuickFIXTradeAdapter(QuickFIXBaseAdapter):
     def __init__(self):
-        super().__init__()
-        self.logged_on = False
-        self.logon_event = threading.Event()
-        self.logout_event = threading.Event()
-        self.initiator = None
-        self.session_id = None
-        self.username = None
-        self.password = None
-        self.device_id = None
-        self.request_responses = {}
-        self.response_events = {}
-        self.current_config_file = None
-
-    def connect(
-        self, username: str, password: str, device_id: Optional[str] = None, timeout: int = 30
-    ) -> Tuple[bool, Optional[str]]:
-        try:
-            self.username = username
-            self.password = password
-            self.device_id = device_id
-
-            # Create runtime configuration file
-            self.current_config_file = QuickFIXConfigManager.update_config_file("trade_session.cfg", "trade")
-            settings = fix.SessionSettings(self.current_config_file)
-            store_factory = fix.FileStoreFactory(settings)
-            log_factory = fix.FileLogFactory(settings)
-
-            self.initiator = fix.SSLSocketInitiator(self, store_factory, settings, log_factory)
-
-            logger.info(f"Connecting as {username} to trade session...")
-            self.initiator.start()
-
-            if self.logon_event.wait(timeout):
-                logger.info("✓ Trade session connected successfully!")
-                return True, None
-            else:
-                logger.error("✗ Trade session connection timeout")
-                return False, "Connection timeout"
-        except Exception as e:
-            logger.error(f"✗ Trade session connection failed: {e}")
-            return False, f"Connection failed: {e}"
-
-    def disconnect(self) -> bool:
-        try:
-            if self.initiator:
-                logger.info("Disconnecting trade session...")
-                self.logout_event.clear()
-                self.initiator.stop()
-                self.logout_event.wait(10)
-                logger.info("✓ Trade session disconnected")
-
-            # Clean up temporary config file
-            if self.current_config_file:
-                QuickFIXConfigManager.cleanup_temp_config(self.current_config_file)
-                self.current_config_file = None
-
-            return True
-        except Exception as e:
-            logger.error(f"Error disconnecting trade session: {e}")
-            return False
-
-    def is_connected(self) -> bool:
-        return self.logged_on
-
-    def onCreate(self, sessionID):
-        logger.info(f"Trade session created: {sessionID}")
-        self.session_id = sessionID
-
-    def onLogon(self, sessionID):
-        logger.info(f"✓ Trade session logged on: {sessionID}")
-        self.logged_on = True
-        self.logon_event.set()
-
-    def onLogout(self, sessionID):
-        logger.info(f"✗ Trade session logged out: {sessionID}")
-        self.logged_on = False
-        self.logout_event.set()
-
-    def toAdmin(self, message, sessionID):
-        msg_type = fix.MsgType()
-        message.getHeader().getField(msg_type)
-
-        if msg_type.getValue() == fix.MsgType_Logon:
-            message.setField(fix.Username(self.username))
-            message.setField(fix.Password(self.password))
-            message.setField(fix.StringField(141, "Y"))
-
-            if self.device_id:
-                message.setField(fix.StringField(10150, self.device_id))
-
-            if config.fix.protocol_spec:
-                message.setField(fix.StringField(10064, config.fix.protocol_spec))
+        super().__init__("trade")
 
     def fromAdmin(self, message, sessionID):
         msg_type = fix.MsgType()
