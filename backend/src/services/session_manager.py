@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
-from src.adapters.fix_adapter import FIXAdapter
+from src.adapters.process_fix_adapter import ProcessFIXAdapter
 from src.config.settings import config
 
 logger = logging.getLogger(__name__)
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class SessionManager:
     def __init__(self):
         # Separate sessions for trade and feed operations
-        self.trade_sessions: Dict[str, FIXAdapter] = {}
-        self.feed_sessions: Dict[str, FIXAdapter] = {}
+        self.trade_sessions: Dict[str, ProcessFIXAdapter] = {}
+        self.feed_sessions: Dict[str, ProcessFIXAdapter] = {}
         self.session_metadata: Dict[str, dict] = {}
         self._lock = asyncio.Lock()
         self._heartbeat_tasks: Dict[str, asyncio.Task] = {}
@@ -25,7 +25,7 @@ class SessionManager:
         password: str,
         device_id: Optional[str] = None,
         connection_type: str = "trade",
-    ) -> FIXAdapter:
+    ) -> ProcessFIXAdapter:
         """Get or create a session for specified connection type (trade or feed)"""
         async with self._lock:
             sessions_dict = self.trade_sessions if connection_type == "trade" else self.feed_sessions
@@ -57,8 +57,8 @@ class SessionManager:
         password: str,
         device_id: Optional[str] = None,
         connection_type: str = "trade",
-    ) -> FIXAdapter:
-        fix_adapter = FIXAdapter(connection_type=connection_type)
+    ) -> ProcessFIXAdapter:
+        fix_adapter = ProcessFIXAdapter(connection_type=connection_type)
 
         success, error_message = fix_adapter.logon(
             username=username, password=password, device_id=device_id, timeout=10
@@ -85,7 +85,7 @@ class SessionManager:
 
         return fix_adapter
 
-    def get_session(self, user_id: str, connection_type: str = "trade") -> Optional[FIXAdapter]:
+    def get_session(self, user_id: str, connection_type: str = "trade") -> Optional[ProcessFIXAdapter]:
         """Get existing session for specified connection type"""
         sessions_dict = self.trade_sessions if connection_type == "trade" else self.feed_sessions
         session_key = f"{user_id}_{connection_type}"
@@ -95,11 +95,11 @@ class SessionManager:
             return sessions_dict[user_id]
         return None
 
-    def get_feed_session(self, user_id: str) -> Optional[FIXAdapter]:
+    def get_feed_session(self, user_id: str) -> Optional[ProcessFIXAdapter]:
         """Convenience method to get feed session"""
         return self.get_session(user_id, "feed")
 
-    def get_trade_session(self, user_id: str) -> Optional[FIXAdapter]:
+    def get_trade_session(self, user_id: str) -> Optional[ProcessFIXAdapter]:
         """Convenience method to get trade session"""
         return self.get_session(user_id, "trade")
 
@@ -133,7 +133,7 @@ class SessionManager:
 
         return {
             "connection_type": connection_type,
-            "is_active": session.is_session_active(),
+            "is_active": session.is_connected(),
             "created_at": created_at,
             "last_activity": last_activity,
             "last_heartbeat": last_heartbeat,
@@ -157,7 +157,7 @@ class SessionManager:
         sessions_dict = self.trade_sessions if connection_type == "trade" else self.feed_sessions
         session = sessions_dict.get(user_id)
 
-        if not session or not session.is_session_active():
+        if not session or not session.is_connected():
             return False
 
         metadata = self.session_metadata[session_key]
@@ -197,7 +197,7 @@ class SessionManager:
         if user_id in sessions_dict:
             try:
                 session = sessions_dict[user_id]
-                session.logout()  # Proper logout
+                session.disconnect()  # Proper disconnect
             except Exception as e:
                 logger.warning(f"Error during {connection_type} session cleanup for {user_id}: {e}")
             finally:
@@ -219,8 +219,11 @@ class SessionManager:
                     await asyncio.sleep(30)  # Send heartbeat every 30 seconds
 
                     session = sessions_dict.get(user_id)
-                    if session and session.is_session_active():
-                        success = session.send_heartbeat()
+                    if session and session.is_connected():
+                        if connection_type == "trade":
+                            success = session.send_heartbeat()
+                        else:
+                            success = session.send_heartbeat()
                         current_time = time.time()
 
                         # Update heartbeat tracking in metadata

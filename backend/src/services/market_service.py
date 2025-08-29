@@ -33,7 +33,7 @@ class MarketService:
                     symbols=[],
                 )
 
-            success, response_data, error_message = session.send_security_list_request(request_id)
+            success, response_data, error_message = await session.send_security_list_request(request_id)
 
             if success and response_data:
                 symbols = []
@@ -126,7 +126,7 @@ class MarketService:
                     bars=[],
                 )
 
-            success, response_data, error_message = session.send_market_history_request(
+            success, response_data, error_message = await session.send_market_history_request(
                 symbol=request.symbol,
                 period_id=request.timeframe.value,
                 max_bars=request.count,

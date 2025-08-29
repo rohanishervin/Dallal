@@ -106,3 +106,16 @@ pytest-swagger.log.*
 postman/
 
 quickfix_client
+
+# QuickFIX runtime configuration files
+backend/trade_session.cfg.runtime
+backend/feed_session.cfg.runtime
+
+# QuickFIX logs directory
+backend/logs/
+
+# Legacy QuickFIX directories (no longer used)
+backend/store/
+backend/log/
+backend/feed_store/
+backend/feed_log/
