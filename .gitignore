@@ -104,3 +104,5 @@ cursor-templates.md
 pytest-swagger.log
 pytest-swagger.log.*
 postman/
+
+quickfix_client
