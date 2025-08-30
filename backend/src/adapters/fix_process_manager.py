@@ -3,11 +3,15 @@ import json
 import logging
 import multiprocessing
 import os
+import queue
 import signal
+import threading
 import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
+
+from ..services.nats_service import nats_service
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,61 @@ class FIXProcessManager:
         self.request_queues: Dict[str, multiprocessing.Queue] = {}
         self.response_queues: Dict[str, multiprocessing.Queue] = {}
         self.process_metadata: Dict[str, dict] = {}
+        # Thread-safe queue for NATS publishing
+        self.nats_publish_queue = queue.Queue()
+        self.nats_publisher_task = None
+
+    async def start_nats_publisher(self):
+        """Start the NATS publisher task"""
+        if self.nats_publisher_task is None:
+            self.nats_publisher_task = asyncio.create_task(self._nats_publisher_loop())
+            logger.info("Started NATS publisher task")
+        else:
+            logger.info("NATS publisher task already running")
+
+    async def stop_nats_publisher(self):
+        """Stop the NATS publisher task"""
+        if self.nats_publisher_task:
+            self.nats_publisher_task.cancel()
+            try:
+                await self.nats_publisher_task
+            except asyncio.CancelledError:
+                pass
+            self.nats_publisher_task = None
+            logger.info("Stopped NATS publisher task")
+
+    async def _nats_publisher_loop(self):
+        """Main loop for publishing messages to NATS"""
+        logger.info("NATS publisher loop starting...")
+        message_count = 0
+        while True:
+            try:
+                # Check for messages to publish (non-blocking)
+                try:
+                    publish_data = self.nats_publish_queue.get_nowait()
+                    symbol = publish_data.get("symbol")
+                    orderbook_data = publish_data.get("orderbook_data")
+                    message_count += 1
+
+                    if symbol and orderbook_data:
+                        await nats_service.publish_orderbook(symbol, orderbook_data)
+                        logger.info(f"Published orderbook for {symbol} to NATS (message #{message_count})")
+                    else:
+                        logger.warning(
+                            f"Invalid publish data: symbol={symbol}, has_orderbook_data={bool(orderbook_data)}"
+                        )
+                except queue.Empty:
+                    # No messages to publish, sleep briefly
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Error publishing to NATS: {e}")
+
+            except asyncio.CancelledError:
+                logger.info("NATS publisher loop cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in NATS publisher loop: {e}")
+                await asyncio.sleep(1)
 
     def start_fix_process(
         self, user_id: str, connection_type: str, username: str, password: str, device_id: Optional[str] = None
@@ -203,6 +262,147 @@ class FIXProcessManager:
             "last_activity": metadata.get("last_activity"),
             "uptime_seconds": int(time.time() - metadata.get("started_at", time.time())),
         }
+
+    def start_orderbook_monitoring(self, process_id: str):
+        """Start monitoring for orderbook updates from a FIX process and publish to NATS"""
+        if process_id not in self.process_metadata:
+            logger.error(f"Process {process_id} not found for orderbook monitoring")
+            return
+
+        logger.info(f"Starting orderbook monitoring for process {process_id}")
+        # Start monitoring for orderbook updates from this process
+        self._start_orderbook_monitoring(process_id)
+
+    def send_market_data_subscribe(
+        self, process_id: str, symbol: str, levels: int = 5, md_req_id: str = None
+    ) -> Tuple[bool, Optional[str]]:
+        """Send market data subscription request to FIX process"""
+        if process_id not in self.request_queues:
+            return False, f"Process {process_id} not found"
+
+        try:
+            request = {
+                "action": "market_data_subscribe",
+                "symbol": symbol,
+                "levels": levels,
+                "md_req_id": md_req_id,
+                "request_id": str(uuid.uuid4()),
+            }
+
+            self.request_queues[process_id].put(request)
+
+            # Wait for response with timeout
+            try:
+                response = self.response_queues[process_id].get(timeout=10)
+                if response.get("success"):
+                    return True, None
+                else:
+                    return False, response.get("error", "Subscription failed")
+            except:
+                return False, "Request timeout"
+
+        except Exception as e:
+            logger.error(f"Error sending market data subscribe request: {e}")
+            return False, f"Request error: {e}"
+
+    def send_market_data_unsubscribe(
+        self, process_id: str, symbol: str, md_req_id: str = None
+    ) -> Tuple[bool, Optional[str]]:
+        """Send market data unsubscription request to FIX process"""
+        if process_id not in self.request_queues:
+            return False, f"Process {process_id} not found"
+
+        try:
+            request = {
+                "action": "market_data_unsubscribe",
+                "symbol": symbol,
+                "md_req_id": md_req_id,
+                "request_id": str(uuid.uuid4()),
+            }
+
+            self.request_queues[process_id].put(request)
+
+            # Wait for response with timeout
+            try:
+                response = self.response_queues[process_id].get(timeout=5)
+                if response.get("success"):
+                    return True, None
+                else:
+                    return False, response.get("error", "Unsubscription failed")
+            except:
+                return False, "Request timeout"
+
+        except Exception as e:
+            logger.error(f"Error sending market data unsubscribe request: {e}")
+            return False, f"Request error: {e}"
+
+    def _start_orderbook_monitoring(self, process_id: str):
+        """Start monitoring for orderbook updates from a FIX process"""
+        import threading
+
+        def monitor_orderbook_updates():
+            logger.info(f"Orderbook monitoring thread started for process {process_id}")
+            while process_id in self.processes and self.processes[process_id].is_alive():
+                try:
+                    if process_id not in self.response_queues:
+                        logger.warning(f"No response queue for process {process_id}")
+                        break
+
+                    # Process all available messages in the queue
+                    messages_processed = 0
+                    while True:
+                        try:
+                            # Use a short timeout to check for multiple messages
+                            # Give more time for the second message (orderbook data) to arrive
+                            timeout = 1.0 if messages_processed == 0 else 0.5
+                            response = self.response_queues[process_id].get(timeout=timeout)
+                            messages_processed += 1
+
+                            response_type = response.get("type", "unknown")
+                            logger.info(
+                                f"MONITORING: Received response #{messages_processed} from process {process_id}: type='{response_type}', keys={list(response.keys()) if isinstance(response, dict) else 'not_dict'}"
+                            )
+
+                            if response.get("type") == "orderbook_update":
+                                # Queue orderbook data for NATS publishing
+                                orderbook_data = response.get("data")
+                                if orderbook_data:
+                                    symbol = orderbook_data.get("symbol")
+                                    if symbol:
+                                        # Put the data in the queue for the NATS publisher task
+                                        try:
+                                            self.nats_publish_queue.put(
+                                                {"symbol": symbol, "orderbook_data": orderbook_data}, block=False
+                                            )
+                                            logger.info(f"Queued orderbook data for {symbol} for NATS publishing")
+                                        except Exception as e:
+                                            logger.error(f"Failed to queue orderbook data for NATS: {e}")
+                                    else:
+                                        logger.warning("No symbol found in orderbook data")
+                                else:
+                                    logger.warning("No orderbook data in response")
+                            else:
+                                # Log other response types for debugging
+                                if response_type not in ["unknown"]:
+                                    logger.debug(f"Ignoring non-orderbook response: {response_type}")
+                                elif isinstance(response, dict) and len(response) > 0:
+                                    logger.debug(f"Received response with unknown type. Full response: {response}")
+
+                        except:
+                            # No more messages available, break inner loop
+                            break
+
+                    # If no messages were processed, continue outer loop
+                    if messages_processed == 0:
+                        continue
+
+                except Exception as e:
+                    logger.error(f"Error in orderbook monitoring for {process_id}: {e}")
+                    time.sleep(1)
+
+        # Start monitoring thread
+        monitor_thread = threading.Thread(target=monitor_orderbook_updates, daemon=True)
+        monitor_thread.start()
 
     def cleanup_all_processes(self):
         """Clean up all FIX processes"""

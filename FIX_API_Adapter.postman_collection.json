@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
 		"name": "FIX API Adapter - Complete Collection",
-		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **Historical Bars**: Get OHLCV price data with configurable time periods\n- **Multiple timeframes**: Support for S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1\n- **Bid/Ask pricing**: Choose between Bid or Ask prices\n- **Comprehensive validation**: Proper error handling and data validation",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **NEW: WebSocket orderbook streaming**\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **WebSocket Orderbook**: Real-time orderbook streaming with subscription management\n- **Historical Bars**: Get OHLCV price data with configurable time periods\n- **Multiple timeframes**: Support for S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1\n- **Bid/Ask pricing**: Choose between Bid or Ask prices\n- **Comprehensive validation**: Proper error handling and data validation\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "12345678"
 	},
@@ -790,6 +790,171 @@
 			"description": "Market data endpoints for retrieving trading instruments, historical bars, and market information."
 		},
 		{
+			"name": "🔌 WebSocket Orderbook",
+			"item": [
+				{
+					"name": "WebSocket Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('user_id');",
+									"    pm.expect(response).to.have.property('websocket_connected');",
+									"    pm.expect(response).to.have.property('active_subscriptions');",
+									"});",
+									"",
+									"// Log WebSocket status",
+									"if (response.success) {",
+									"    console.log(\"✅ WebSocket Status Retrieved\");",
+									"    console.log(\"👤 User ID:\", response.user_id);",
+									"    console.log(\"🔌 WebSocket Connected:\", response.websocket_connected);",
+									"    console.log(\"📊 Active Subscriptions:\", response.active_subscriptions.length);",
+									"    console.log(\"🌐 Total Connections:\", response.total_connections);",
+									"    ",
+									"    if (response.active_subscriptions.length > 0) {",
+									"        console.log(\"📋 Subscribed to:\", response.active_subscriptions.join(', '));",
+									"    } else {",
+									"        console.log(\"📭 No active subscriptions\");",
+									"    }",
+									"} else {",
+									"    console.log(\"❌ Failed to get WebSocket status\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ws/orderbook/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ws",
+								"orderbook",
+								"status"
+							]
+						},
+						"description": "Get WebSocket connection status and active subscriptions.\n\n**Authentication Required**: JWT token in Authorization header\n\n**Returns**:\n- WebSocket connection status\n- Active orderbook subscriptions\n- Total WebSocket connections\n- User identification"
+					},
+					"response": [
+						{
+							"name": "WebSocket Status - Connected",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/ws/orderbook/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"ws",
+										"orderbook",
+										"status"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"user_id\": \"trader123\",\n    \"websocket_connected\": true,\n    \"active_subscriptions\": [\"EUR/USD\", \"GBP/USD\"],\n    \"total_connections\": 3,\n    \"message\": \"WebSocket status for user trader123\"\n}"
+						},
+						{
+							"name": "WebSocket Status - Not Connected",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/ws/orderbook/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"ws",
+										"orderbook",
+										"status"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"user_id\": \"trader123\",\n    \"websocket_connected\": false,\n    \"active_subscriptions\": [],\n    \"total_connections\": 0,\n    \"message\": \"WebSocket status for user trader123\"\n}"
+						}
+					]
+				},
+				{
+					"name": "WebSocket Connection Guide",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/docs#/WebSocket",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"docs"
+							],
+							"hash": "#/WebSocket"
+						},
+						"description": "**WebSocket Orderbook Connection Guide**\n\n## Connection URL\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\n\n## Message Format\nAll messages are JSON objects with a `type` field:\n\n### Subscribe to Orderbook\n```json\n{\n  \"type\": \"subscribe\",\n  \"symbol\": \"EUR/USD\",\n  \"levels\": 5,\n  \"md_req_id\": \"optional_custom_id\"\n}\n```\n\n### Unsubscribe from Orderbook\n```json\n{\n  \"type\": \"unsubscribe\",\n  \"symbol\": \"EUR/USD\",\n  \"md_req_id\": \"optional_id_to_cancel\"\n}\n```\n\n## Received Messages\n\n### Orderbook Data\n```json\n{\n  \"type\": \"orderbook\",\n  \"symbol\": \"EUR/USD\",\n  \"request_id\": \"OB_EUR/USD_1640995200000\",\n  \"data\": {\n    \"symbol\": \"EUR/USD\",\n    \"timestamp\": \"2023-12-01T10:30:15\",\n    \"best_bid\": 1.08945,\n    \"best_ask\": 1.08955,\n    \"mid_price\": 1.08950,\n    \"spread\": 0.00010,\n    \"spread_bps\": 0.92,\n    \"bids\": [\n      {\"price\": 1.08945, \"size\": 100000, \"level\": 1},\n      {\"price\": 1.08940, \"size\": 200000, \"level\": 2}\n    ],\n    \"asks\": [\n      {\"price\": 1.08955, \"size\": 150000, \"level\": 1},\n      {\"price\": 1.08960, \"size\": 100000, \"level\": 2}\n    ]\n  },\n  \"timestamp\": \"2023-12-01T10:30:15.123456\"\n}\n```\n\n### Success/Error Messages\n```json\n{\n  \"type\": \"success\",\n  \"message\": \"Subscribed to orderbook for EUR/USD\",\n  \"symbol\": \"EUR/USD\",\n  \"md_req_id\": \"OB_EUR/USD_1640995200000\"\n}\n```\n\n```json\n{\n  \"type\": \"error\",\n  \"error\": \"Failed to subscribe to INVALID/SYMBOL: unknown symbol\",\n  \"symbol\": \"INVALID/SYMBOL\"\n}\n```\n\n### Heartbeat\n```json\n{\n  \"type\": \"heartbeat\",\n  \"timestamp\": \"2023-12-01T10:30:15.123456\"\n}\n```\n\n## Recommended WebSocket Clients\n- **Browser**: WebSocket King Chrome Extension\n- **Command Line**: `wscat -c \"ws://localhost:8000/ws/orderbook?token=YOUR_TOKEN\"`\n- **Python**: `websockets` library\n- **JavaScript**: Native WebSocket API\n\n## Features\n- **Real-time Updates**: Live orderbook streaming\n- **Multiple Symbols**: Subscribe to multiple instruments\n- **Automatic Cleanup**: FIX subscriptions cancelled on disconnect\n- **Error Handling**: Comprehensive error messages\n- **Authentication**: JWT token-based security"
+					}
+				}
+			],
+			"description": "WebSocket endpoints for real-time orderbook streaming. Use external WebSocket clients to connect and subscribe to live market data."
+		},
+		{
 			"name": "🏥 Health & System",
 			"item": [
 				{
@@ -958,7 +1123,7 @@
 					"",
 					"// Check if auth token exists for protected endpoints",
 					"const authToken = pm.environment.get(\"auth_token\");",
-					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\");",
+					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\") || pm.request.url.toString().includes(\"/ws\");",
 					"",
 					"if (isProtectedEndpoint && !authToken) {",
 					"    console.warn(\"⚠️  This endpoint requires authentication. Run the Login request first.\");",
@@ -993,6 +1158,11 @@
 		{
 			"key": "base_url",
 			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "ws_base_url",
+			"value": "ws://localhost:8000",
 			"type": "string"
 		},
 		{

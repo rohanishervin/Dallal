@@ -313,3 +313,40 @@ class ProcessFIXAdapter:
     def is_logged_in(self, value):
         """Is logged in setter (for compatibility - ignored in process adapter)"""
         pass
+
+    def set_orderbook_callback(self, callback):
+        """Set orderbook callback for real-time market data (feed sessions only)"""
+        if self.connection_type == "feed":
+            fix_process_manager.set_orderbook_callback(self.process_id, callback)
+        else:
+            logger.warning("Orderbook callback can only be set on feed sessions")
+
+    async def send_market_data_subscribe(
+        self, symbol: str, levels: int = 5, md_req_id: str = None
+    ) -> Tuple[bool, Optional[str]]:
+        """Subscribe to market data for a symbol (feed sessions only)"""
+        if self.connection_type != "feed":
+            return False, "Market data subscription only available on feed sessions"
+
+        if not self.is_connected():
+            return False, "Session not connected"
+
+        try:
+            return fix_process_manager.send_market_data_subscribe(self.process_id, symbol, levels, md_req_id)
+        except Exception as e:
+            logger.error(f"Error subscribing to market data: {e}")
+            return False, f"Subscription error: {e}"
+
+    async def send_market_data_unsubscribe(self, symbol: str, md_req_id: str = None) -> Tuple[bool, Optional[str]]:
+        """Unsubscribe from market data for a symbol (feed sessions only)"""
+        if self.connection_type != "feed":
+            return False, "Market data unsubscription only available on feed sessions"
+
+        if not self.is_connected():
+            return False, "Session not connected"
+
+        try:
+            return fix_process_manager.send_market_data_unsubscribe(self.process_id, symbol, md_req_id)
+        except Exception as e:
+            logger.error(f"Error unsubscribing from market data: {e}")
+            return False, f"Unsubscription error: {e}"

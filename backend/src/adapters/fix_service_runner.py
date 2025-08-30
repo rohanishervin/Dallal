@@ -73,6 +73,10 @@ class FIXServiceProcess:
 
             logger.info(f"FIX {self.connection_type} service connected successfully")
 
+            # Set up response queue for feed sessions to send orderbook data to NATS
+            if self.connection_type == "feed" and hasattr(self.adapter, "set_response_queue"):
+                self.adapter.set_response_queue(self.response_queue)
+
             # Start request processing loop
             self._process_requests()
 
@@ -103,11 +107,12 @@ class FIXServiceProcess:
 
                 request_id = request.get("request_id")
                 request_type = request.get("type")
+                action = request.get("action")
                 request_data = request.get("data", {})
 
-                logger.info(f"Processing {request_type} request: {request_id}")
+                logger.info(f"Processing {request_type or action} request: {request_id}")
 
-                if request_type == "shutdown":
+                if request_type == "shutdown" or action == "shutdown":
                     logger.info("Received shutdown request")
                     self.running = False
                     break
@@ -121,8 +126,12 @@ class FIXServiceProcess:
                     self._handle_test_request(request_id)
                 elif request_type == "market_data":
                     self._handle_market_data_request(request_id, request_data)
+                elif action == "market_data_subscribe":
+                    self._handle_market_data_subscribe(request_id, request)
+                elif action == "market_data_unsubscribe":
+                    self._handle_market_data_unsubscribe(request_id, request)
                 else:
-                    self._send_error_response(request_id, f"Unknown request type: {request_type}")
+                    self._send_error_response(request_id, f"Unknown request type: {request_type or action}")
 
             except Exception as e:
                 logger.error(f"Error processing request: {e}")
@@ -260,6 +269,89 @@ class FIXServiceProcess:
         self.response_queue.put(
             {"request_id": request_id, "success": False, "error": error_msg, "timestamp": time.time()}
         )
+
+    def _orderbook_callback(self, md_req_id: str, orderbook_data: dict):
+        """Handle real-time orderbook updates from the FIX adapter"""
+        try:
+            # Send orderbook update through response queue for the process manager to handle
+            # This allows the main process to get real-time updates
+            self.response_queue.put(
+                {
+                    "type": "orderbook_update",
+                    "md_req_id": md_req_id,
+                    "orderbook_data": orderbook_data,
+                    "timestamp": time.time(),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error in orderbook callback: {e}")
+
+    def _handle_market_data_subscribe(self, request_id: str, request: dict):
+        """Handle market data subscription request"""
+        try:
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            if self.connection_type != "feed":
+                self._send_error_response(request_id, "Market data subscription only available on feed sessions")
+                return
+
+            symbol = request.get("symbol")
+            levels = request.get("levels", 5)
+            md_req_id = request.get("md_req_id")
+
+            if not symbol:
+                self._send_error_response(request_id, "Symbol is required for market data subscription")
+                return
+
+            success, error = self.adapter.send_market_data_subscribe(symbol, levels, md_req_id)
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "success": success,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling market data subscribe: {e}")
+            self._send_error_response(request_id, f"Subscription error: {e}")
+
+    def _handle_market_data_unsubscribe(self, request_id: str, request: dict):
+        """Handle market data unsubscription request"""
+        try:
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            if self.connection_type != "feed":
+                self._send_error_response(request_id, "Market data unsubscription only available on feed sessions")
+                return
+
+            symbol = request.get("symbol")
+            md_req_id = request.get("md_req_id")
+
+            if not symbol:
+                self._send_error_response(request_id, "Symbol is required for market data unsubscription")
+                return
+
+            success, error = self.adapter.send_market_data_unsubscribe(symbol, md_req_id)
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "success": success,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling market data unsubscribe: {e}")
+            self._send_error_response(request_id, f"Unsubscription error: {e}")
 
     def _cleanup(self):
         """Cleanup resources"""

@@ -7,6 +7,7 @@ websockets==12.0
 slowapi==0.1.9
 python-dotenv==1.0.0
 quickfix-ssl
+nats-py==2.7.2
 
 # Testing dependencies
 pytest==7.4.3

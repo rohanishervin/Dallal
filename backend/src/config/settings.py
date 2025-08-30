@@ -47,11 +47,26 @@ class RateLimitConfig:
         self.login_rate_limit = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
 
 
+class NATSConfig:
+    def __init__(self):
+        self.servers = os.getenv("NATS_SERVERS", "nats://localhost:4222").split(",")
+        self.max_reconnect_attempts = int(os.getenv("NATS_MAX_RECONNECT", "10"))
+        self.reconnect_time_wait = int(os.getenv("NATS_RECONNECT_WAIT", "2"))
+        self.ping_interval = int(os.getenv("NATS_PING_INTERVAL", "30"))
+        self.max_outstanding_pings = int(os.getenv("NATS_MAX_PINGS", "3"))
+
+        # Subject patterns
+        self.orderbook_subject = "orderbook.{symbol}"
+        self.session_subject = "session.{user_id}"
+        self.heartbeat_subject = "heartbeat.{process_id}"
+
+
 class AppConfig:
     def __init__(self):
         self.fix = FIXConfig()
         self.jwt = JWTConfig()
         self.rate_limit = RateLimitConfig()
+        self.nats = NATSConfig()
         self.debug = os.getenv("DEBUG", "False").lower() == "true"
 
 

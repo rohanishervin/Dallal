@@ -3,6 +3,7 @@ import logging
 import time
 from typing import Dict, Optional, Tuple, Union
 
+from src.adapters.fix_process_manager import fix_process_manager
 from src.adapters.process_fix_adapter import ProcessFIXAdapter
 from src.config.settings import config
 
@@ -72,6 +73,8 @@ class SessionManager:
             self.trade_sessions[user_id] = fix_adapter
         else:
             self.feed_sessions[user_id] = fix_adapter
+            # No need for monitoring - QuickFIX publishes directly to NATS
+            logger.info(f"Feed session created for user {user_id} - orderbook data will be published directly to NATS")
 
         session_key = f"{user_id}_{connection_type}"
         self.session_metadata[session_key] = {
@@ -260,6 +263,12 @@ class SessionManager:
 
         # Start new heartbeat task
         self._heartbeat_tasks[session_key] = asyncio.create_task(heartbeat_monitor())
+
+    def _setup_orderbook_monitoring(self, fix_adapter: ProcessFIXAdapter, user_id: str):
+        """Start NATS monitoring for orderbook updates from this feed session"""
+        process_id = f"{user_id}_feed"
+        fix_process_manager.start_orderbook_monitoring(process_id)
+        logger.info(f"Started NATS orderbook monitoring for feed session {process_id}")
 
     async def cleanup_all_sessions(self):
         async with self._lock:

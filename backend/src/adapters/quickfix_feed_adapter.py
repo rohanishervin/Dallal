@@ -1,11 +1,13 @@
+import asyncio
 import logging
 import threading
 import time
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import quickfix as fix
 
+from ..services.nats_service import nats_service
 from .quickfix_base_adapter import FIXMessageParser, QuickFIXBaseAdapter
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,8 @@ logger = logging.getLogger(__name__)
 class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
     def __init__(self):
         super().__init__("feed")
+        self.active_subscriptions: Dict[str, str] = {}
+        self.nats_connected = False
 
     def fromAdmin(self, message, sessionID):
         msg_type = fix.MsgType()
@@ -42,6 +46,8 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
             self._handle_market_data_incremental_refresh(message)
         elif msg_type_str == "Y":
             self._handle_market_data_request_reject(message)
+        elif msg_type_str == "U1011":
+            self._handle_market_data_ack(message)
         elif msg_type_str == "y":
             self._handle_security_list_response(message)
         elif msg_type_str == "U1002":
@@ -53,17 +59,112 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
 
     def _handle_market_data_snapshot(self, message):
         logger.info("Received Market Data Snapshot (W)")
+        try:
+            md_req_id = ""
+            if message.isSetField(262):
+                md_req_id_field = fix.MDReqID()
+                message.getField(md_req_id_field)
+                md_req_id = md_req_id_field.getValue()
+
+            orderbook_data = self._parse_orderbook_message(message)
+            logger.info(
+                f"Parsed orderbook data: {bool(orderbook_data)}, has_error: {orderbook_data.get('error') if orderbook_data else 'N/A'}"
+            )
+
+            if orderbook_data and not orderbook_data.get("error"):
+                logger.info(f"Sending orderbook data to main process for NATS publishing")
+                self._send_orderbook_to_main_process(orderbook_data)
+            else:
+                if orderbook_data and orderbook_data.get("error"):
+                    logger.error(f"Orderbook parsing error: {orderbook_data.get('error')}")
+                else:
+                    logger.warning("No orderbook data parsed from message")
+
+        except Exception as e:
+            logger.error(f"Error handling market data snapshot: {e}")
+            logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
 
     def _handle_market_data_incremental_refresh(self, message):
         logger.info("Received Market Data Incremental Refresh (X)")
+        try:
+            md_req_id = ""
+            if message.isSetField(262):
+                md_req_id_field = fix.MDReqID()
+                message.getField(md_req_id_field)
+                md_req_id = md_req_id_field.getValue()
+
+            orderbook_data = self._parse_orderbook_message(message)
+
+            if orderbook_data:
+                logger.debug(f"Sending incremental orderbook data to main process for NATS publishing")
+                self._send_orderbook_to_main_process(orderbook_data)
+
+        except Exception as e:
+            logger.error(f"Error handling market data incremental refresh: {e}")
+
+    def _handle_market_data_ack(self, message):
+        logger.info("Received Market Data Request Ack (U1011)")
+        try:
+            md_req_id = ""
+            if message.isSetField(262):
+                md_req_id_field = fix.MDReqID()
+                message.getField(md_req_id_field)
+                md_req_id = md_req_id_field.getValue()
+
+            total_snaps = None
+            if message.isSetField(10049):
+                total_snaps_field = fix.IntField(10049)
+                message.getField(total_snaps_field)
+                total_snaps = total_snaps_field.getValue()
+
+            logger.info(f"Market Data Request Acknowledged - ID: {md_req_id}, Total Snapshots: {total_snaps}")
+            logger.debug(f"Available response events: {list(self.response_events.keys())}")
+
+            if md_req_id in self.response_events:
+                logger.debug(f"Setting response for request {md_req_id}")
+                self.request_responses[md_req_id] = (True, {"acknowledged": True, "total_snaps": total_snaps}, None)
+                self.response_events[md_req_id].set()
+            else:
+                logger.warning(f"No event found for request ID: {md_req_id}")
+
+        except Exception as e:
+            logger.error(f"Error handling market data ack: {e}")
 
     def _handle_market_data_request_reject(self, message):
         logger.warning("Received Market Data Request Reject (Y)")
         try:
+            md_req_id = ""
+            if message.isSetField(262):
+                md_req_id_field = fix.MDReqID()
+                message.getField(md_req_id_field)
+                md_req_id = md_req_id_field.getValue()
+
+            reject_reason = None
+            if message.isSetField(281):
+                rej_reason_field = fix.MDReqRejReason()
+                message.getField(rej_reason_field)
+                reject_reason = rej_reason_field.getValue()
+
+            text = None
             if message.isSetField(58):
                 text_field = fix.Text()
                 message.getField(text_field)
-                logger.warning(f"Reject reason: {text_field.getValue()}")
+                text = text_field.getValue()
+
+            error_msg = f"Market Data Request Rejected - ID: {md_req_id}"
+            if reject_reason:
+                reason_map = {"0": "Unknown symbol", "5": "Unsupported MarketDepth", "D": "THROTTLING"}
+                reason_text = reason_map.get(reject_reason, f"Unknown reason: {reject_reason}")
+                error_msg += f", Reason: {reason_text}"
+            if text:
+                error_msg += f", Description: {text}"
+
+            logger.warning(error_msg)
+
+            if md_req_id in self.response_events:
+                self.request_responses[md_req_id] = (False, None, error_msg)
+                self.response_events[md_req_id].set()
+
         except Exception as e:
             logger.error(f"Error handling market data request reject: {e}")
 
@@ -156,6 +257,171 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
                 self.response_events[request_id].set()
         except Exception as e:
             logger.error(f"Error handling market history reject: {e}")
+
+    def set_response_queue(self, response_queue):
+        self.response_queue = response_queue
+
+    def _send_orderbook_to_main_process(self, orderbook_data: dict):
+        try:
+            # Direct NATS publishing from QuickFIX process
+            symbol = orderbook_data.get("symbol")
+            if symbol:
+                self._publish_to_nats_sync(symbol, orderbook_data)
+                logger.info(f"Successfully published orderbook data to NATS (symbol: {symbol})")
+            else:
+                logger.error("No symbol in orderbook data")
+        except Exception as e:
+            logger.error(f"Failed to publish orderbook data to NATS: {e}")
+
+    def _publish_to_nats_sync(self, symbol: str, orderbook_data: dict):
+        """Synchronously publish to NATS from QuickFIX process"""
+        import json
+        import subprocess
+
+        try:
+            # Use nats CLI to publish (simple and reliable)
+            subject = f"orderbook.{symbol}"
+            payload = json.dumps(orderbook_data, default=str)
+
+            # Use nats CLI tool to publish
+            result = subprocess.run(
+                ["/usr/bin/nats", "pub", subject, payload], capture_output=True, text=True, timeout=2
+            )
+
+            if result.returncode == 0:
+                logger.debug(f"Published to NATS subject {subject}")
+            else:
+                logger.error(f"NATS pub failed: {result.stderr}")
+                # Fallback to Python client
+                self._publish_to_nats_python_sync(symbol, orderbook_data)
+
+        except subprocess.TimeoutExpired:
+            logger.error("NATS publish timeout")
+        except Exception as e:
+            logger.error(f"NATS CLI publish error: {e}")
+            # Fallback to Python client
+            self._publish_to_nats_python_sync(symbol, orderbook_data)
+
+    def _publish_to_nats_python_sync(self, symbol: str, orderbook_data: dict):
+        """Fallback: Use Python NATS client synchronously"""
+        import asyncio
+        import json
+
+        import nats
+
+        async def publish():
+            try:
+                nc = await nats.connect("nats://localhost:4222")
+                subject = f"orderbook.{symbol}"
+                payload = json.dumps(orderbook_data, default=str)
+                await nc.publish(subject, payload.encode())
+                await nc.close()
+                logger.debug(f"Published to NATS via Python client")
+            except Exception as e:
+                logger.error(f"Python NATS publish failed: {e}")
+
+        try:
+            asyncio.run(publish())
+        except Exception as e:
+            logger.error(f"Failed to run async NATS publish: {e}")
+
+    def send_market_data_subscribe(
+        self, symbol: str, levels: int = 5, md_req_id: str = None
+    ) -> Tuple[bool, Optional[str]]:
+        if not self.is_connected():
+            return False, "Feed session not connected"
+
+        try:
+            if not md_req_id:
+                md_req_id = f"OB_{symbol}_{int(time.time() * 1000)}"
+
+            message = fix.Message()
+            header = message.getHeader()
+            header.setField(fix.MsgType(fix.MsgType_MarketDataRequest))
+
+            message.setField(fix.MDReqID(md_req_id))
+            message.setField(fix.SubscriptionRequestType("1"))
+            message.setField(fix.MarketDepth(levels))
+
+            message.setField(fix.MDUpdateType(0))
+
+            message.setField(fix.NoMDEntryTypes(1))
+            entry_types_group = fix.Group(267, 269)
+            entry_types_group.setField(fix.MDEntryType("2"))
+            message.addGroup(entry_types_group)
+
+            message.setField(fix.NoRelatedSym(1))
+            symbols_group = fix.Group(146, 55)
+            symbols_group.setField(fix.Symbol(symbol))
+            message.addGroup(symbols_group)
+
+            event = threading.Event()
+            self.response_events[md_req_id] = event
+
+            fix.Session.sendToTarget(message, self.session_id)
+            logger.info(f"Sent Market Data Subscribe for {symbol} (levels: {levels}, req_id: {md_req_id})")
+
+            logger.debug(f"Waiting for response for request ID: {md_req_id}")
+            if event.wait(10):
+                result = self.request_responses.pop(md_req_id, (False, None, "No response"))
+                self.response_events.pop(md_req_id, None)
+
+                logger.debug(f"Received response for {md_req_id}: {result}")
+                if result[0]:
+                    self.active_subscriptions[symbol] = md_req_id
+                    logger.info(f"Successfully subscribed to {symbol} with req_id {md_req_id}")
+                    return True, None
+                else:
+                    logger.warning(f"Subscription failed for {symbol}: {result[2]}")
+                    return False, result[2] or "Subscription failed"
+            else:
+                self.response_events.pop(md_req_id, None)
+                logger.warning(f"Subscription request timed out for {symbol} (req_id: {md_req_id})")
+                return False, "Subscription request timed out"
+
+        except Exception as e:
+            logger.error(f"Market data subscription failed: {e}")
+            return False, f"Subscription failed: {e}"
+
+    def send_market_data_unsubscribe(self, symbol: str, md_req_id: str = None) -> Tuple[bool, Optional[str]]:
+        if not self.is_connected():
+            return False, "Feed session not connected"
+
+        try:
+            if not md_req_id and symbol in self.active_subscriptions:
+                md_req_id = self.active_subscriptions[symbol]
+            elif not md_req_id:
+                return False, f"No active subscription found for {symbol}"
+
+            message = fix.Message()
+            header = message.getHeader()
+            header.setField(fix.MsgType(fix.MsgType_MarketDataRequest))
+
+            message.setField(fix.MDReqID(md_req_id))
+            message.setField(fix.SubscriptionRequestType("2"))
+            message.setField(fix.MarketDepth(0))
+
+            message.setField(fix.NoMDEntryTypes(1))
+            entry_types_group = fix.Group(267, 269)
+            entry_types_group.setField(fix.MDEntryType("2"))
+            message.addGroup(entry_types_group)
+
+            message.setField(fix.NoRelatedSym(1))
+            symbols_group = fix.Group(146, 55)
+            symbols_group.setField(fix.Symbol(symbol))
+            message.addGroup(symbols_group)
+
+            fix.Session.sendToTarget(message, self.session_id)
+            logger.info(f"Sent Market Data Unsubscribe for {symbol} (req_id: {md_req_id})")
+
+            if symbol in self.active_subscriptions:
+                del self.active_subscriptions[symbol]
+
+            return True, None
+
+        except Exception as e:
+            logger.error(f"Market data unsubscription failed: {e}")
+            return False, f"Unsubscription failed: {e}"
 
     def send_market_data_request(self, symbol: str, md_req_id: str = None) -> Tuple[bool, Optional[str]]:
         if not self.is_connected():
@@ -311,6 +577,194 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
         except Exception as e:
             logger.error(f"Market history request failed: {e}")
             return False, None, f"Request failed: {e}"
+
+    def _parse_orderbook_message(self, message) -> dict:
+        try:
+            logger.debug("Starting orderbook message parsing")
+            symbol = fix.Symbol()
+            message.getField(symbol)
+            symbol_val = symbol.getValue()
+
+            md_req_id = ""
+            if message.isSetField(262):
+                md_req_id_field = fix.MDReqID()
+                message.getField(md_req_id_field)
+                md_req_id = md_req_id_field.getValue()
+
+            orig_time = None
+            try:
+                if message.isSetField(42):
+                    orig_time_field = fix.StringField(42)
+                    message.getField(orig_time_field)
+                    orig_time = orig_time_field.getValue()
+            except Exception:
+                pass
+
+            tick_id = None
+            try:
+                if message.isSetField(10094):
+                    tick_id_field = fix.StringField(10094)
+                    message.getField(tick_id_field)
+                    tick_id = tick_id_field.getValue()
+            except Exception:
+                pass
+
+            # Check for indicative tick flag - use StringField to handle 'N' values
+            is_indicative = False
+            try:
+                if message.isSetField(10230):
+                    indicative_field = fix.StringField(10230)
+                    message.getField(indicative_field)
+                    indicative_value = indicative_field.getValue()
+                    # Only set to True if the value is explicitly '1', treat 'N' or other values as False
+                    is_indicative = indicative_value == "1"
+            except Exception as e:
+                logger.debug(f"Error getting indicative flag: {e}")
+                is_indicative = False
+
+            no_md_entries = fix.NoMDEntries()
+            message.getField(no_md_entries)
+            num_entries = no_md_entries.getValue()
+
+            bids = []
+            asks = []
+            trades = []
+
+            # Define safe_float function BEFORE using it
+            def safe_float(value):
+                if not value or str(value).upper() in ["N", "NULL", ""]:
+                    return None
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return None
+
+            for i in range(1, num_entries + 1):
+                try:
+                    group = fix.Group(268, 269)
+                    message.getGroup(i, group)
+
+                    entry_type = fix.MDEntryType()
+                    group.getField(entry_type)
+                    entry_type_val = entry_type.getValue()
+
+                    # Get price using StringField to handle 'N' values safely
+                    price = None
+                    if group.isSetField(270):  # MDEntryPx tag
+                        try:
+                            price_field = fix.StringField(270)
+                            group.getField(price_field)
+                            price_str = price_field.getValue()
+                            price = safe_float(price_str)
+                        except Exception as e:
+                            logger.debug(f"Error getting price value: {e}")
+                            price = None
+
+                    # Get size using StringField to handle 'N' values safely
+                    size = None
+                    if group.isSetField(271):  # MDEntrySize tag
+                        try:
+                            size_field = fix.StringField(271)
+                            group.getField(size_field)
+                            size_str = size_field.getValue()
+                            size = safe_float(size_str)
+                        except Exception as e:
+                            logger.debug(f"Error getting size value: {e}")
+                            size = None
+
+                    # Store entry data - only add entries with valid prices
+                    if price is not None:
+                        entry_data = {
+                            "price": price,
+                            "size": size,
+                            "level": len(bids) + 1
+                            if entry_type_val == "0"
+                            else (len(asks) + 1 if entry_type_val == "1" else len(trades) + 1),
+                        }
+
+                        if entry_type_val == "0":  # Bid
+                            bids.append(entry_data)
+                        elif entry_type_val == "1":  # Ask/Offer
+                            asks.append(entry_data)
+                        elif entry_type_val == "2":  # Trade
+                            trades.append(entry_data)
+                    else:
+                        logger.debug(f"Skipping entry {i} with invalid price: {price}")
+
+                except Exception as entry_error:
+                    logger.warning(f"Error parsing market data entry {i}: {entry_error}")
+                    continue
+
+            # Filter out None prices before sorting
+            bids = [bid for bid in bids if bid["price"] is not None]
+            asks = [ask for ask in asks if ask["price"] is not None]
+            trades = [trade for trade in trades if trade["price"] is not None]
+
+            bids = sorted(bids, key=lambda x: x["price"], reverse=True)
+            asks = sorted(asks, key=lambda x: x["price"])
+
+            for i, bid in enumerate(bids, 1):
+                bid["level"] = i
+            for i, ask in enumerate(asks, 1):
+                ask["level"] = i
+
+            best_bid = bids[0]["price"] if bids else None
+            best_ask = asks[0]["price"] if asks else None
+            mid_price = None
+            spread = None
+            spread_bps = None
+
+            if best_bid and best_ask:
+                mid_price = (best_bid + best_ask) / 2
+                spread = best_ask - best_bid
+                spread_bps = (spread / mid_price) * 10000 if mid_price else None
+
+            latest_price = None
+            price_source = None
+
+            if trades:
+                latest_price = trades[-1]["price"]
+                price_source = "trade"
+            elif mid_price:
+                latest_price = mid_price
+                price_source = "mid"
+
+            order_book_json = {
+                "symbol": symbol_val,
+                "request_id": md_req_id,
+                "timestamp": orig_time,
+                "tick_id": tick_id,
+                "is_indicative": is_indicative,
+                "latest_price": {"price": latest_price, "source": price_source},
+                "market_data": {
+                    "best_bid": best_bid,
+                    "best_ask": best_ask,
+                    "mid_price": mid_price,
+                    "spread": spread,
+                    "spread_bps": spread_bps,
+                },
+                "order_book": {"bids": bids, "asks": asks, "trades": trades if trades else None},
+                "levels": {"bid_levels": len(bids), "ask_levels": len(asks), "trade_count": len(trades)},
+                "metadata": {
+                    "total_entries": num_entries,
+                    "has_trades": len(trades) > 0,
+                    "book_depth": max(len(bids), len(asks)) if bids or asks else 0,
+                },
+            }
+
+            return order_book_json
+
+        except Exception as e:
+            error_json = {
+                "error": True,
+                "message": f"Error parsing order book: {str(e)}",
+                "symbol": None,
+                "timestamp": None,
+            }
+            logger.error(f"Error creating order book JSON: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Full exception details: {str(e)}")
+            return error_json
 
     def _parse_security_list_message(self, message) -> dict:
         try:
