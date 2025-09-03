@@ -71,11 +71,27 @@ logs/
 
 # Project specific
 backend/.env
+
+# Frontend (Next.js)
 frontend/.env*
 frontend/.next/
 frontend/node_modules/
 frontend/out/
 frontend/build/
+frontend/dist/
+frontend/.turbo/
+frontend/coverage/
+frontend/.nyc_output/
+frontend/storybook-static/
+
+# Frontend package manager files
+frontend/package-lock.json
+frontend/yarn.lock
+frontend/pnpm-lock.yaml
+
+# Frontend TypeScript
+frontend/*.tsbuildinfo
+frontend/.tscache/
 
 # Docker
 docker-compose.override.yml
@@ -119,3 +135,12 @@ backend/store/
 backend/log/
 backend/feed_store/
 backend/feed_log/
+
+# TradingView Charting Library
+# Note: frontend/public/charting_library/ is a git submodule - tracked separately
+# The submodule itself is tracked, but we ignore any local modifications or temp files
+frontend/public/charting_library/.git
+frontend/public/charting_library/node_modules/
+
+# Design assets (moved from frontend/design to project root)
+design-assets/
