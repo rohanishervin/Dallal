@@ -39,13 +39,26 @@ export function MarketWatch() {
   }
 
   return (
-    <div className="w-80 bg-gray-900 rounded-lg border border-gray-700">
-      <div className="p-4 border-b border-gray-700">
-        <h3 className="text-white font-medium">Market Watch</h3>
+    <div className="w-full h-full bg-gray-900 rounded-lg border border-gray-700 flex flex-col">
+      <div className="p-3 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-white font-medium text-sm">Market Watch</h3>
+        </div>
+        <select
+          value={selectedSymbol}
+          onChange={(e) => setSelectedSymbol(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-600 text-white px-2 py-1.5 rounded text-xs focus:outline-none focus:border-blue-500"
+        >
+          {instruments.map((instrument) => (
+            <option key={instrument.symbol} value={instrument.symbol}>
+              {instrument.symbol} - {instrument.description}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="max-h-96 overflow-y-auto">
-        {topInstruments.map((instrument) => {
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+        {instruments.slice(0, 12).map((instrument) => {
           const mockData = mockPrices[instrument.symbol as keyof typeof mockPrices] || {
             price: 1.0000,
             change: 0,
@@ -64,18 +77,18 @@ export function MarketWatch() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-white font-medium text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="text-white font-medium text-sm truncate">
                     {instrument.symbol}
                   </div>
-                  <div className="text-gray-400 text-xs">
-                    {instrument.description}
+                  <div className="text-gray-400 text-xs truncate">
+                    {instrument.description || 'No description'}
                   </div>
                 </div>
                 
-                <div className="text-right">
+                <div className="text-right ml-2 flex-shrink-0">
                   <div className="text-white font-mono text-sm">
-                    {formatPrice(mockData.price, parseInt(instrument.px_precision))}
+                    {formatPrice(mockData.price, parseInt(instrument.px_precision || '5'))}
                   </div>
                   <div className={`flex items-center text-xs ${
                     isPositive ? 'text-green-400' : 'text-red-400'
@@ -85,7 +98,9 @@ export function MarketWatch() {
                     ) : (
                       <TrendingDown size={12} className="mr-1" />
                     )}
-                    {isPositive ? '+' : ''}{mockData.change.toFixed(4)} ({isPositive ? '+' : ''}{mockData.changePercent.toFixed(2)}%)
+                    <span>
+                      {isPositive ? '+' : ''}{mockData.change.toFixed(4)} ({isPositive ? '+' : ''}{mockData.changePercent.toFixed(2)}%)
+                    </span>
                   </div>
                 </div>
               </div>

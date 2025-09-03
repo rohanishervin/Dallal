@@ -96,11 +96,21 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
           },
           overrides: {
             'paneProperties.background': '#111827',
+            'paneProperties.backgroundType': 'solid',
             'paneProperties.vertGridProperties.color': '#374151',
             'paneProperties.horzGridProperties.color': '#374151',
+            'paneProperties.vertGridProperties.style': 0,
+            'paneProperties.horzGridProperties.style': 0,
             'symbolWatermarkProperties.transparency': 90,
             'scalesProperties.textColor': '#9ca3af',
-            'scalesProperties.backgroundColor': '#1f2937'
+            'scalesProperties.backgroundColor': '#111827',
+            'scalesProperties.lineColor': '#374151',
+            'mainSeriesProperties.candleStyle.upColor': '#22c55e',
+            'mainSeriesProperties.candleStyle.downColor': '#ef4444',
+            'mainSeriesProperties.candleStyle.borderUpColor': '#22c55e',
+            'mainSeriesProperties.candleStyle.borderDownColor': '#ef4444',
+            'mainSeriesProperties.candleStyle.wickUpColor': '#22c55e',
+            'mainSeriesProperties.candleStyle.wickDownColor': '#ef4444'
           },
           studies_overrides: {
             'volume.volume.color.0': '#ef4444',
@@ -153,7 +163,7 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
   }
 
   return (
-    <div className="flex-1 bg-gray-900 rounded-lg border border-gray-700 relative">
+    <div className="w-full h-full bg-gray-900 rounded-lg border border-gray-700 relative overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
           <div className="text-center">
@@ -165,8 +175,11 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
       )}
       <div 
         ref={chartContainerRef} 
-        className="w-full h-full rounded-lg"
-        style={{ minHeight: '400px' }}
+        className="w-full h-full"
+        style={{ 
+          minHeight: '100%',
+          backgroundColor: '#111827'
+        }}
       />
     </div>
   )

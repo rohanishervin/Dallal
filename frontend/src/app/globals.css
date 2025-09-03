@@ -40,3 +40,115 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+html {
+  height: 100vh;
+  overflow: hidden;
+}
+
+#__next {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.scrollbar-track-gray-800::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+/* Hide scrollbar when not needed */
+.overflow-y-auto:not(:hover)::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.overflow-y-auto:hover::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Bottom section scroll trigger */
+.bottom-section-trigger {
+  height: 2px;
+  background: rgba(75, 85, 99, 0.5);
+  transition: all 0.3s ease;
+}
+
+.bottom-section-trigger:hover {
+  height: 4px;
+  background: rgba(75, 85, 99, 0.8);
+}
+
+/* Resize handle styling */
+.resize-y {
+  resize: vertical;
+}
+
+.resize-y::-webkit-resizer {
+  background: #4b5563;
+  border-radius: 2px;
+}
+
+/* Better focus styles for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Improved hover states */
+.hover\:bg-gray-800:hover {
+  transition: background-color 0.15s ease-in-out;
+}
+
+.hover\:bg-gray-700:hover {
+  transition: background-color 0.15s ease-in-out;
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
