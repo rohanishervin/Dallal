@@ -1,27 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #111827;
-  --foreground: #f9fafb;
+  --background: #000000;
+  --foreground: #ffffff;
   
-  --primary: #3b82f6;
+  --primary: #1f2937;
   --primary-foreground: #ffffff;
   
-  --secondary: #374151;
+  --secondary: #111827;
   --secondary-foreground: #f9fafb;
   
-  --muted: #374151;
+  --muted: #1f2937;
   --muted-foreground: #9ca3af;
   
-  --accent: #374151;
-  --accent-foreground: #f9fafb;
+  --accent: #1f2937;
+  --accent-foreground: #ffffff;
   
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   
   --border: #374151;
-  --input: #374151;
-  --ring: #3b82f6;
+  --input: #1f2937;
+  --ring: #4b5563;
 }
 
 @theme inline {
@@ -32,8 +32,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #000000;
+  color: #ffffff;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
@@ -96,6 +96,30 @@ html {
 /* Smooth scrolling */
 * {
   scroll-behavior: smooth;
+}
+
+/* TradingView chart background override */
+iframe[src*="tradingview"] {
+  background: #000000 !important;
+}
+
+/* Force TradingView black theme */
+.tv-chart-container,
+.tv-chart-container iframe,
+.tv-chart-container canvas {
+  background: #000000 !important;
+  background-color: #000000 !important;
+}
+
+/* TradingView widget styling */
+div[id*="tradingview"] {
+  background: #000000 !important;
+  background-color: #000000 !important;
+}
+
+div[id*="tradingview"] iframe {
+  background: #000000 !important;
+  background-color: #000000 !important;
 }
 
 /* Bottom section scroll trigger */

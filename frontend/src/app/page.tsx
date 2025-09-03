@@ -25,7 +25,7 @@ export default function TradingDashboard() {
   }, [isAuthenticated, loadInstruments])
 
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
+    <div className="h-screen bg-black flex flex-col overflow-hidden">
       <LoginModal isOpen={!isAuthenticated} />
       
       <div className={`flex-1 flex flex-col min-h-0 ${!isAuthenticated ? 'blur-sm' : ''}`}>
@@ -58,7 +58,7 @@ export default function TradingDashboard() {
         <div className="bottom-section-trigger"></div>
 
         {/* Bottom section - Positions & Orders (appears on scroll down) */}
-        <div className="h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 group hover:h-80 focus-within:h-80 transition-all duration-500 ease-in-out bg-gray-900 border-t border-gray-700">
+        <div className="h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900 group hover:h-80 focus-within:h-80 transition-all duration-500 ease-in-out bg-gray-950 border-t border-gray-800">
           <div className="min-h-80 p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-medium">Positions & Orders</h3>
@@ -69,11 +69,11 @@ export default function TradingDashboard() {
             
             <div className="grid grid-cols-2 gap-4">
               {/* Positions */}
-              <div className="bg-gray-800 rounded-lg p-3">
+              <div className="bg-gray-900 rounded-lg p-3">
                 <h4 className="text-white font-medium text-sm mb-3">Open Positions</h4>
                 <div className="space-y-2">
                   {Array.from({ length: 5 }, (_, i) => (
-                    <div key={i} className="p-2 bg-gray-700 rounded text-xs text-gray-300 hover:bg-gray-600 transition-colors">
+                    <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-medium">EUR/USD</span>
                         <span className={i % 2 === 0 ? "text-green-400" : "text-red-400"}>
@@ -90,14 +90,14 @@ export default function TradingDashboard() {
               </div>
 
               {/* Orders */}
-              <div className="bg-gray-800 rounded-lg p-3">
+              <div className="bg-gray-900 rounded-lg p-3">
                 <h4 className="text-white font-medium text-sm mb-3">Pending Orders</h4>
                 <div className="space-y-2">
                   {Array.from({ length: 3 }, (_, i) => (
-                    <div key={i} className="p-2 bg-gray-700 rounded text-xs text-gray-300 hover:bg-gray-600 transition-colors">
+                    <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-medium">GBP/USD</span>
-                        <span className="text-blue-400">PENDING</span>
+                        <span className="text-gray-400">PENDING</span>
                       </div>
                       <div className="flex justify-between text-gray-400">
                         <span>{(Math.random() * 1 + 0.5).toFixed(2)} lots</span>
