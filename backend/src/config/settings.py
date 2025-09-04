@@ -49,7 +49,7 @@ class RateLimitConfig:
 
 class NATSConfig:
     def __init__(self):
-        self.servers = os.getenv("NATS_SERVERS", "nats://localhost:4222").split(",")
+        self.servers = os.getenv("NATS_URL", "nats://localhost:4222").split(",")
         self.max_reconnect_attempts = int(os.getenv("NATS_MAX_RECONNECT", "10"))
         self.reconnect_time_wait = int(os.getenv("NATS_RECONNECT_WAIT", "2"))
         self.ping_interval = int(os.getenv("NATS_PING_INTERVAL", "30"))

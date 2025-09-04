@@ -17,12 +17,10 @@ class QuickFIXConfigManager:
         port = config.fix.trade_port if connection_type == "trade" else config.fix.feed_port
 
         # Add dynamic settings
-        dynamic_settings = f"""
-                            SocketConnectHost={config.fix.host}
-                            SocketConnectPort={port}
-                            SenderCompID={config.fix.sender_comp_id}
-                            TargetCompID={config.fix.target_comp_id}
-                            """
+        dynamic_settings = f"""SocketConnectHost={config.fix.host}
+SocketConnectPort={port}
+SenderCompID={config.fix.sender_comp_id}
+TargetCompID={config.fix.target_comp_id}"""
 
         # Insert dynamic settings after [DEFAULT] section
         lines = content.split("\n")

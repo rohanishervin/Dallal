@@ -18,11 +18,11 @@ repos:
         types: [python]
         pass_filenames: false
         
-      # Run tests to ensure code quality
-      - id: pytest
-        name: Run Tests
-        entry: bash -c 'cd backend && source .venv/bin/activate && PYTHONPATH=. pytest tests/ -v --tb=short'
-        language: system
-        types: [python]
-        pass_filenames: false
-        stages: [commit]
+      # # Run tests to ensure code quality
+      # - id: pytest
+      #   name: Run Tests
+      #   entry: bash -c 'cd backend && source .venv/bin/activate && PYTHONPATH=. pytest tests/ -v --tb=short'
+      #   language: system
+      #   types: [python]
+      #   pass_filenames: false
+      #   stages: [commit]

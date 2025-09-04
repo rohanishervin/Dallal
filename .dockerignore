@@ -1,0 +1,37 @@
+# Docker Compose for FIX API Adapter Development
+
+## Quick Start
+
+```bash
+# Start all services
+docker-compose up
+
+# Start in background
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# Rebuild and start
+docker-compose up --build
+```
+
+## Services
+
+- **Frontend**: Next.js app on http://localhost:3000
+- **Backend**: FastAPI on http://localhost:8000  
+- **NATS**: Message broker on localhost:4222 (HTTP monitoring on 8222)
+
+## Hot Reloading
+
+All services support hot reloading:
+- Frontend: Next.js dev server with Turbopack
+- Backend: Uvicorn with --reload flag
+- NATS: Alpine image with JetStream enabled
+
+## Volumes
+
+- Source code mounted for live development
+- Node modules and Next.js cache excluded for performance
+- Backend virtual environment cached
+- NATS data and logs persisted

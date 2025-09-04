@@ -1,0 +1,48 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: nats-server --jetstream --http_port 8222
+    volumes:
+      - nats_data:/data
+      - nats_logs:/logs
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_cache:/app/.venv
+    environment:
+      - NATS_URL=nats://nats:4222
+      - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000
+    depends_on:
+      - nats
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+    depends_on:
+      - backend
+    command: pnpm dev
+
+volumes:
+  nats_data:
+  nats_logs:
+  backend_cache:
