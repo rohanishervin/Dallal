@@ -5,6 +5,7 @@ import { useWebSocketStore } from './websocket'
 interface MarketState {
   instruments: Instrument[]
   selectedSymbol: string
+  selectedSymbolInfo: Instrument | null
   isLoadingInstruments: boolean
   isLoadingHistory: boolean
   historyBars: HistoryBar[]
@@ -18,6 +19,7 @@ interface MarketState {
 export const useMarketStore = create<MarketState>((set, get) => ({
   instruments: [],
   selectedSymbol: 'EUR/USD',
+  selectedSymbolInfo: null,
   isLoadingInstruments: false,
   isLoadingHistory: false,
   historyBars: [],
@@ -67,7 +69,15 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   },
 
   setSelectedSymbol: (symbol: string) => {
-    set({ selectedSymbol: symbol })
+    const state = get()
+    
+    // Find the symbol info from instruments
+    const symbolInfo = state.instruments.find(inst => inst.symbol === symbol) || null
+    
+    set({ 
+      selectedSymbol: symbol,
+      selectedSymbolInfo: symbolInfo
+    })
     
     // Trigger WebSocket subscription to the new symbol
     const wsStore = useWebSocketStore.getState()

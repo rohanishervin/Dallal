@@ -8,7 +8,7 @@ import type { OrderBookData } from '@/services/websocket'
 
 export function OrderBook() {
   const [mounted, setMounted] = useState(false)
-  const { selectedSymbol } = useMarketStore()
+  const { selectedSymbol, selectedSymbolInfo } = useMarketStore()
   const { orderBookData, isConnected, connectionError, getOrderBookForSymbol, lastUpdate } = useWebSocketStore()
   const [currentOrderBook, setCurrentOrderBook] = useState<OrderBookData | null>(null)
 
@@ -92,28 +92,37 @@ export function OrderBook() {
     )
   }
 
-  // Calculate precision from the symbol's instrument data
-  const getPricePrecision = (symbol: string) => {
-    // Default precision, could be enhanced by fetching from instruments data
+  // Get precision and contract multiplier from symbol info
+  const getPricePrecision = () => {
+    if (selectedSymbolInfo?.px_precision) {
+      return parseInt(selectedSymbolInfo.px_precision) || 5
+    }
     return 5
+  }
+  
+  const getRoundLot = () => {
+    if (selectedSymbolInfo?.round_lot) {
+      return parseFloat(selectedSymbolInfo.round_lot) || 1
+    }
+    return 1
   }
 
   const formatPriceWithCommas = (price: number, precision: number) => {
-    return price.toLocaleString('en-US', {
-      minimumFractionDigits: precision,
-      maximumFractionDigits: precision
-    })
+    return price.toFixed(precision)
   }
 
-  const formatSize = (size: number) => {
-    if (size >= 1000000) {
-      return `${(size / 1000000).toFixed(2)}M`
-    } else if (size >= 1000) {
-      return `${(size / 1000).toFixed(2)}K`
-    } else if (size >= 1) {
-      return `${size.toFixed(5)}`
+  const formatLots = (size: number) => {
+    const roundLot = getRoundLot()
+    const lots = size / roundLot
+    
+    if (lots >= 1000000) {
+      return `${(lots / 1000000).toFixed(2)}M`
+    } else if (lots >= 1000) {
+      return `${(lots / 1000).toFixed(2)}K`
+    } else if (lots >= 1) {
+      return `${lots.toFixed(2)}`
     } else {
-      return `${size.toFixed(8)}`
+      return `${lots.toFixed(5)}`
     }
   }
 
@@ -130,13 +139,21 @@ export function OrderBook() {
   // Get exactly 5 levels for each side, sorted properly with cumulative totals
   const getTopAsks = () => {
     const asks = [...currentOrderBook.asks]
-      .sort((a, b) => b.price - a.price) // Sort descending (highest ask first, like in the image)
+      .sort((a, b) => a.price - b.price) // Sort ascending (lowest ask closest to spread)
       .slice(0, 5)
+      .reverse() // Reverse to show highest ask first, lowest ask last (closest to spread)
+    
+    // Pad with empty levels if needed to always have 5 levels
+    while (asks.length < 5) {
+      asks.unshift({ price: 0, size: 0, level: asks.length + 1 }) // Add empty levels at top
+    }
     
     // Calculate cumulative totals
     let cumulativeTotal = 0
     return asks.map((ask, index) => {
-      cumulativeTotal += ask.size * ask.price
+      if (ask.price > 0 && ask.size > 0) {
+        cumulativeTotal += ask.size * ask.price
+      }
       return {
         ...ask,
         cumulativeTotal
@@ -149,10 +166,17 @@ export function OrderBook() {
       .sort((a, b) => b.price - a.price) // Sort descending (highest bid first)
       .slice(0, 5)
     
+    // Pad with empty levels if needed to always have 5 levels
+    while (bids.length < 5) {
+      bids.push({ price: 0, size: 0, level: bids.length + 1 }) // Add empty levels at bottom
+    }
+    
     // Calculate cumulative totals
     let cumulativeTotal = 0
     return bids.map((bid, index) => {
-      cumulativeTotal += bid.size * bid.price
+      if (bid.price > 0 && bid.size > 0) {
+        cumulativeTotal += bid.size * bid.price
+      }
       return {
         ...bid,
         cumulativeTotal
@@ -175,7 +199,7 @@ export function OrderBook() {
     topBids: topBids.map(b => ({ price: b.price, size: b.size, total: b.cumulativeTotal }))
   })
 
-  const pricePrecision = getPricePrecision(currentOrderBook.symbol)
+  const pricePrecision = getPricePrecision()
 
   return (
     <div className="w-full bg-gray-900 border border-gray-700 flex flex-col h-96">
@@ -198,7 +222,7 @@ export function OrderBook() {
         {/* Header */}
         <div className="grid grid-cols-2 text-xs text-gray-400 px-3 py-2 border-b border-gray-700 bg-gray-800">
           <div className="text-left">Price</div>
-          <div className="text-right">Amount</div>
+          <div className="text-right">Lot</div>
         </div>
 
         {/* Asks Section - Red theme */}
@@ -218,7 +242,7 @@ export function OrderBook() {
                   {ask.price > 0 ? formatPriceWithCommas(ask.price, pricePrecision) : '-'}
                 </div>
                 <div className="relative text-right text-white font-mono">
-                  {ask.size > 0 ? formatSize(ask.size) : '-'}
+                  {ask.size > 0 ? formatLots(ask.size) : '-'}
                 </div>
               </div>
             )
@@ -226,9 +250,9 @@ export function OrderBook() {
         </div>
 
         {/* Spread Section */}
-        <div className="bg-gray-800 border-t border-b border-gray-600 py-2">
+        <div className="bg-gray-800 border-t border-b border-gray-600 py-1">
           <div className="text-center text-white font-mono text-xs">
-            {formatPriceWithCommas(currentOrderBook.best_ask, pricePrecision)} - {formatPriceWithCommas(currentOrderBook.best_bid, pricePrecision)} = {formatPriceWithCommas(currentOrderBook.spread, pricePrecision)}
+            {((currentOrderBook.best_ask - currentOrderBook.best_bid) * Math.pow(10, pricePrecision)).toFixed(0)} points
           </div>
         </div>
 
@@ -249,7 +273,7 @@ export function OrderBook() {
                   {bid.price > 0 ? formatPriceWithCommas(bid.price, pricePrecision) : '-'}
                 </div>
                 <div className="relative text-right text-white font-mono">
-                  {bid.size > 0 ? formatSize(bid.size) : '-'}
+                  {bid.size > 0 ? formatLots(bid.size) : '-'}
                 </div>
               </div>
             )
