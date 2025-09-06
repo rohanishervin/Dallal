@@ -202,7 +202,7 @@ export function OrderBook() {
   const pricePrecision = getPricePrecision()
 
   return (
-    <div className="w-full bg-gray-900 border border-gray-700 flex flex-col h-96">
+    <div className="w-full bg-gray-900 border border-gray-700 flex flex-col">
       <div className="p-3 border-b border-gray-700 flex-shrink-0 bg-gray-900">
         <div className="flex items-center justify-between">
           <h3 className="text-white font-semibold text-sm">Order Book</h3>
@@ -218,7 +218,7 @@ export function OrderBook() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="overflow-hidden">
         {/* Header */}
         <div className="grid grid-cols-2 text-xs text-gray-400 px-3 py-2 border-b border-gray-700 bg-gray-800">
           <div className="text-left">Price</div>
@@ -281,15 +281,6 @@ export function OrderBook() {
         </div>
       </div>
 
-      {/* Footer with metadata */}
-      <div className="p-2 border-t border-gray-700 flex-shrink-0 bg-gray-900">
-        <div className="flex justify-between text-xs text-gray-400 font-mono">
-          <span>Depth: 5</span>
-          <span>
-            Last: {new Date(currentOrderBook.timestamp).toLocaleTimeString()}
-          </span>
-        </div>
-      </div>
     </div>
   )
 }
