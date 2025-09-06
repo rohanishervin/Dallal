@@ -10,10 +10,14 @@ interface MarketState {
   isLoadingHistory: boolean
   historyBars: HistoryBar[]
   priceType: 'A' | 'B'
+  bestBid: number | null
+  bestAsk: number | null
+  lastPriceUpdate: number
   loadInstruments: () => Promise<void>
   loadHistory: (symbol: string, timeframe: string, count?: number) => Promise<void>
   setSelectedSymbol: (symbol: string) => void
   setPriceType: (type: 'A' | 'B') => void
+  updateLivePrices: (symbol: string, bestBid: number, bestAsk: number) => void
 }
 
 export const useMarketStore = create<MarketState>((set, get) => ({
@@ -24,6 +28,9 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   isLoadingHistory: false,
   historyBars: [],
   priceType: 'B',
+  bestBid: null,
+  bestAsk: null,
+  lastPriceUpdate: 0,
 
   loadInstruments: async () => {
     set({ isLoadingInstruments: true })
@@ -76,7 +83,10 @@ export const useMarketStore = create<MarketState>((set, get) => ({
     
     set({ 
       selectedSymbol: symbol,
-      selectedSymbolInfo: symbolInfo
+      selectedSymbolInfo: symbolInfo,
+      bestBid: null,
+      bestAsk: null,
+      lastPriceUpdate: 0
     })
     
     // Trigger WebSocket subscription to the new symbol
@@ -89,6 +99,35 @@ export const useMarketStore = create<MarketState>((set, get) => ({
 
   setPriceType: (type: 'A' | 'B') => {
     set({ priceType: type })
+  },
+
+  updateLivePrices: (symbol: string, bestBid: number, bestAsk: number) => {
+    const state = get()
+    
+    // Only update if this is for the currently selected symbol
+    if (symbol !== state.selectedSymbol) {
+      return
+    }
+    
+    // Only update if prices actually changed to avoid unnecessary re-renders
+    if (state.bestBid === bestBid && state.bestAsk === bestAsk) {
+      return
+    }
+    
+    console.log('📈 Market store: Updating live prices:', {
+      symbol,
+      oldBid: state.bestBid,
+      newBid: bestBid,
+      oldAsk: state.bestAsk,
+      newAsk: bestAsk,
+      priceType: state.priceType
+    })
+    
+    set({
+      bestBid,
+      bestAsk,
+      lastPriceUpdate: Date.now()
+    })
   },
 }))
 

@@ -21,8 +21,13 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
   const [error, setError] = useState<string | null>(null)
   const [priceType, setPriceType] = useState<'B' | 'A'>('B')
   
-  const { selectedSymbol } = useMarketStore()
+  const { selectedSymbol, priceType: marketPriceType } = useMarketStore()
   const currentSymbol = symbol || selectedSymbol
+  
+  // Sync local price type with market store price type
+  useEffect(() => {
+    setPriceType(marketPriceType)
+  }, [marketPriceType])
 
   useEffect(() => {
     const loadTradingViewScript = () => {
@@ -340,6 +345,8 @@ export function TradingViewChart({ symbol }: TradingViewChartProps) {
           console.error('Error removing TradingView widget:', err)
         }
       }
+      // Clean up any active subscriptions in the datafeed
+      tradingViewDatafeed.cleanup?.()
     }
   }, [currentSymbol, priceType])
 

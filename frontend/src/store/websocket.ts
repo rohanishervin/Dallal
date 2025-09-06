@@ -81,6 +81,8 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
         wsService.on('orderbook', (message) => {
           const orderBookData = message.data
           console.log('Received orderbook data:', orderBookData.symbol, orderBookData)
+          
+          // Update websocket store
           set((state) => ({
             orderBookData: {
               ...state.orderBookData,
@@ -89,6 +91,14 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
             lastUpdate: Date.now(),
             connectionError: null // Clear any previous connection errors when we receive data
           }))
+          
+          // Update market store with live prices for real-time chart updates
+          const marketStore = require('./market').useMarketStore.getState()
+          marketStore.updateLivePrices(
+            orderBookData.symbol,
+            orderBookData.best_bid,
+            orderBookData.best_ask
+          )
         })
 
         await wsService.connect(token)
