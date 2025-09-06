@@ -9,20 +9,77 @@ import { TradePanel } from '@/components/trading/trade-panel'
 import { LoginModal } from '@/components/auth/login-modal'
 import { useAuthStore } from '@/store/auth'
 import { useMarketStore } from '@/store/market'
+import { useWebSocketStore } from '@/store/websocket'
+import { apiClient } from '@/lib/api'
+import { WebSocketDebugPanel } from '@/components/debug/websocket-status'
 
 export default function TradingDashboard() {
-  const { isAuthenticated, checkSession } = useAuthStore()
-  const { loadInstruments } = useMarketStore()
+  const { isAuthenticated, sessionStatus, checkSession } = useAuthStore()
+  const { loadInstruments, selectedSymbol } = useMarketStore()
+  const { connect, disconnect, subscribeToSymbol, isConnected } = useWebSocketStore()
 
+  // Initial session check
   useEffect(() => {
     checkSession()
   }, [checkSession])
 
+  // Load instruments when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       loadInstruments()
     }
   }, [isAuthenticated, loadInstruments])
+
+  // Handle WebSocket connection lifecycle
+  useEffect(() => {
+    const connectWebSocket = async () => {
+      // Only connect if:
+      // 1. User is authenticated
+      // 2. Session status shows healthy trade and feed sessions
+      // 3. WebSocket is not already connected
+      if (
+        isAuthenticated && 
+        sessionStatus?.success && 
+        sessionStatus.session?.overall_active &&
+        sessionStatus.session?.trade_session?.is_active &&
+        sessionStatus.session?.feed_session?.is_active &&
+        !isConnected
+      ) {
+        const token = apiClient['token']
+        if (token) {
+          try {
+            console.log('Connecting to WebSocket...')
+            await connect(token)
+            console.log('WebSocket connected successfully')
+            // Subscribe to default symbol if available
+            if (selectedSymbol) {
+              console.log(`Subscribing to ${selectedSymbol}`)
+              subscribeToSymbol(selectedSymbol, 5)
+            }
+          } catch (error) {
+            console.error('WebSocket connection error:', error)
+          }
+        }
+      }
+    }
+
+    connectWebSocket()
+
+    // Cleanup on logout
+    return () => {
+      if (!isAuthenticated && isConnected) {
+        disconnect()
+      }
+    }
+  }, [isAuthenticated, sessionStatus, selectedSymbol, isConnected, connect, disconnect, subscribeToSymbol])
+
+  // Handle symbol changes for WebSocket subscription
+  useEffect(() => {
+    if (isConnected && selectedSymbol) {
+      console.log(`Switching WebSocket subscription to ${selectedSymbol}`)
+      subscribeToSymbol(selectedSymbol, 5)
+    }
+  }, [selectedSymbol, isConnected, subscribeToSymbol])
 
   return (
     <div className="h-screen bg-black flex flex-col overflow-hidden">
@@ -53,6 +110,9 @@ export default function TradingDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Debug WebSocket Status - Remove in production */}
+        {/* <WebSocketDebugPanel /> */}
 
         {/* Trigger area for bottom section */}
         <div className="bottom-section-trigger"></div>

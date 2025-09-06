@@ -275,43 +275,22 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
 
     def _publish_to_nats_sync(self, symbol: str, orderbook_data: dict):
         """Synchronously publish to NATS from QuickFIX process"""
-        import json
-        import subprocess
-
-        try:
-            # Use nats CLI to publish (simple and reliable)
-            subject = f"orderbook.{symbol}"
-            payload = json.dumps(orderbook_data, default=str)
-
-            # Use nats CLI tool to publish
-            result = subprocess.run(
-                ["/usr/bin/nats", "pub", subject, payload], capture_output=True, text=True, timeout=2
-            )
-
-            if result.returncode == 0:
-                logger.debug(f"Published to NATS subject {subject}")
-            else:
-                logger.error(f"NATS pub failed: {result.stderr}")
-                # Fallback to Python client
-                self._publish_to_nats_python_sync(symbol, orderbook_data)
-
-        except subprocess.TimeoutExpired:
-            logger.error("NATS publish timeout")
-        except Exception as e:
-            logger.error(f"NATS CLI publish error: {e}")
-            # Fallback to Python client
-            self._publish_to_nats_python_sync(symbol, orderbook_data)
+        # Use Python NATS client directly instead of CLI
+        self._publish_to_nats_python_sync(symbol, orderbook_data)
 
     def _publish_to_nats_python_sync(self, symbol: str, orderbook_data: dict):
         """Fallback: Use Python NATS client synchronously"""
         import asyncio
         import json
+        import os
 
         import nats
 
         async def publish():
             try:
-                nc = await nats.connect("nats://localhost:4222")
+                # Use environment variable for NATS URL, fallback to Docker service name
+                nats_url = os.getenv("NATS_URL", "nats://nats:4222")
+                nc = await nats.connect(nats_url)
                 subject = f"orderbook.{symbol}"
                 payload = json.dumps(orderbook_data, default=str)
                 await nc.publish(subject, payload.encode())
