@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { apiClient, type Instrument, type HistoryBar } from '@/lib/api'
+import { useWebSocketStore } from './websocket'
 
 interface MarketState {
   instruments: Instrument[]
@@ -67,6 +68,13 @@ export const useMarketStore = create<MarketState>((set, get) => ({
 
   setSelectedSymbol: (symbol: string) => {
     set({ selectedSymbol: symbol })
+    
+    // Trigger WebSocket subscription to the new symbol
+    const wsStore = useWebSocketStore.getState()
+    if (wsStore.isConnected) {
+      console.log(`Market store: Subscribing to ${symbol}`)
+      wsStore.subscribeToSymbol(symbol, 5)
+    }
   },
 
   setPriceType: (type: 'A' | 'B') => {

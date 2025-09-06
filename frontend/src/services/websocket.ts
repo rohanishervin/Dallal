@@ -146,7 +146,7 @@ export class WebSocketService {
       symbol,
       levels
     }
-    console.log('Sending subscribe message:', message)
+    console.log('Sending subscribe message (preserving exact case):', message)
     this.sendMessage(message)
   }
 

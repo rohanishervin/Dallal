@@ -21,12 +21,6 @@ export function OrderBook() {
     if (selectedSymbol) {
       const orderBook = getOrderBookForSymbol(selectedSymbol)
       setCurrentOrderBook(orderBook)
-      
-      // Subscribe to the selected symbol if WebSocket is connected
-      if (isConnected && selectedSymbol) {
-        const { subscribeToSymbol } = useWebSocketStore.getState()
-        subscribeToSymbol(selectedSymbol, 5)
-      }
     }
   }, [selectedSymbol, orderBookData, getOrderBookForSymbol, isConnected])
 

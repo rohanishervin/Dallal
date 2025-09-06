@@ -2,32 +2,34 @@
 
 import { useState, useEffect } from 'react'
 import { useMarketStore } from '@/store/market'
-import { formatPrice } from '@/lib/utils'
-import { TrendingUp, TrendingDown } from 'lucide-react'
-
-const getMockPrices = () => ({
-  'EUR/USD': { price: 1.0856, change: 0.0012, changePercent: 0.11 },
-  'GBP/USD': { price: 1.2634, change: -0.0023, changePercent: -0.18 },
-  'USD/JPY': { price: 148.45, change: 0.34, changePercent: 0.23 },
-  'AUD/USD': { price: 0.6789, change: 0.0045, changePercent: 0.67 },
-  'USD/CHF': { price: 0.8923, change: -0.0012, changePercent: -0.13 },
-})
+import { Search } from 'lucide-react'
 
 export function MarketWatch() {
   const { instruments, selectedSymbol, setSelectedSymbol } = useMarketStore()
   const [mounted, setMounted] = useState(false)
-  const [mockPrices, setMockPrices] = useState<ReturnType<typeof getMockPrices> | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     setMounted(true)
-    setMockPrices(getMockPrices())
   }, [])
 
-  const topInstruments = instruments.slice(0, 8)
+  const tradeEnabledInstruments = instruments.filter(instrument => instrument.trade_enabled)
+  
+  const filteredInstruments = tradeEnabledInstruments.filter(instrument => {
+    const normalizedSearchTerm = searchTerm.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const normalizedSymbol = instrument.symbol.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const normalizedDescription = instrument.description ? 
+      instrument.description.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+    
+    return normalizedSymbol.includes(normalizedSearchTerm) ||
+           normalizedDescription.includes(normalizedSearchTerm) ||
+           instrument.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           (instrument.description && instrument.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  })
 
-  if (!mounted || !mockPrices) {
+  if (!mounted) {
     return (
-      <div className="w-80 bg-gray-900 rounded-lg border border-gray-700">
+      <div className="w-full h-full bg-gray-900 rounded-lg border border-gray-700">
         <div className="p-4 border-b border-gray-700">
           <h3 className="text-white font-medium">Market Watch</h3>
         </div>
@@ -44,69 +46,60 @@ export function MarketWatch() {
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-white font-medium text-sm">Market Watch</h3>
         </div>
-        <select
-          value={selectedSymbol}
-          onChange={(e) => setSelectedSymbol(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-600 text-white px-2 py-1.5 rounded text-xs focus:outline-none focus:border-blue-500"
-        >
-          {instruments.map((instrument) => (
-            <option key={instrument.symbol} value={instrument.symbol}>
-              {instrument.symbol} - {instrument.description}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search instruments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-600 text-white px-8 py-1.5 rounded text-xs focus:outline-none focus:border-blue-500"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-        {instruments.slice(0, 12).map((instrument) => {
-          const mockData = mockPrices[instrument.symbol as keyof typeof mockPrices] || {
-            price: 1.0000,
-            change: 0,
-            changePercent: 0
-          }
-          
+        <div className="grid grid-cols-4 gap-2 p-2 text-xs text-gray-400 border-b border-gray-800 sticky top-0 bg-gray-900">
+          <div className="font-medium">Symbol</div>
+          <div className="font-medium">Description</div>
+          <div className="font-medium">Contract Size</div>
+          <div className="font-medium">Precision</div>
+        </div>
+        
+        {filteredInstruments.map((instrument) => {
           const isSelected = instrument.symbol === selectedSymbol
-          const isPositive = mockData.change >= 0
 
           return (
             <button
               key={instrument.symbol}
               onClick={() => setSelectedSymbol(instrument.symbol)}
-              className={`w-full p-3 border-b border-gray-800 hover:bg-gray-800 transition-colors text-left ${
+              className={`w-full p-2 border-b border-gray-800 hover:bg-gray-800 transition-colors text-left ${
                 isSelected ? 'bg-blue-900/20 border-blue-700' : ''
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="text-white font-medium text-sm truncate">
-                    {instrument.symbol}
-                  </div>
-                  <div className="text-gray-400 text-xs truncate">
-                    {instrument.description || 'No description'}
-                  </div>
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="text-white font-medium truncate">
+                  {instrument.symbol}
                 </div>
-                
-                <div className="text-right ml-2 flex-shrink-0">
-                  <div className="text-white font-mono text-sm">
-                    {formatPrice(mockData.price, parseInt(instrument.px_precision || '5'))}
-                  </div>
-                  <div className={`flex items-center text-xs ${
-                    isPositive ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {isPositive ? (
-                      <TrendingUp size={12} className="mr-1" />
-                    ) : (
-                      <TrendingDown size={12} className="mr-1" />
-                    )}
-                    <span>
-                      {isPositive ? '+' : ''}{mockData.change.toFixed(4)} ({isPositive ? '+' : ''}{mockData.changePercent.toFixed(2)}%)
-                    </span>
-                  </div>
+                <div className="text-gray-300 truncate">
+                  {instrument.description || 'No description'}
+                </div>
+                <div className="text-gray-300 text-right">
+                  {instrument.round_lot}
+                </div>
+                <div className="text-gray-300 text-right">
+                  {instrument.px_precision}
                 </div>
               </div>
             </button>
           )
         })}
+        
+        {filteredInstruments.length === 0 && (
+          <div className="p-4 text-center text-gray-400 text-sm">
+            No instruments found
+          </div>
+        )}
       </div>
     </div>
   )

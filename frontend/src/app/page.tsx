@@ -51,11 +51,7 @@ export default function TradingDashboard() {
             console.log('Connecting to WebSocket...')
             await connect(token)
             console.log('WebSocket connected successfully')
-            // Subscribe to default symbol if available
-            if (selectedSymbol) {
-              console.log(`Subscribing to ${selectedSymbol}`)
-              subscribeToSymbol(selectedSymbol, 5)
-            }
+            // Initial subscription will be handled by market store
           } catch (error) {
             console.error('WebSocket connection error:', error)
           }
@@ -73,13 +69,7 @@ export default function TradingDashboard() {
     }
   }, [isAuthenticated, sessionStatus, selectedSymbol, isConnected, connect, disconnect, subscribeToSymbol])
 
-  // Handle symbol changes for WebSocket subscription
-  useEffect(() => {
-    if (isConnected && selectedSymbol) {
-      console.log(`Switching WebSocket subscription to ${selectedSymbol}`)
-      subscribeToSymbol(selectedSymbol, 5)
-    }
-  }, [selectedSymbol, isConnected, subscribeToSymbol])
+  // Symbol changes are now handled by the market store
 
   return (
     <div className="h-screen bg-black flex flex-col overflow-hidden">
@@ -132,20 +122,24 @@ export default function TradingDashboard() {
               <div className="bg-gray-900 rounded-lg p-3">
                 <h4 className="text-white font-medium text-sm mb-3">Open Positions</h4>
                 <div className="space-y-2">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-medium">EUR/USD</span>
-                        <span className={i % 2 === 0 ? "text-green-400" : "text-red-400"}>
-                          {i % 2 === 0 ? "LONG" : "SHORT"}
-                        </span>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const lots = [1.25, 0.75, 2.10, 1.50, 0.90][i]
+                    const pnl = [125.50, -87.25, 234.75, -156.30, 98.40][i]
+                    return (
+                      <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-medium">EUR/USD</span>
+                          <span className={i % 2 === 0 ? "text-green-400" : "text-red-400"}>
+                            {i % 2 === 0 ? "LONG" : "SHORT"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-gray-400">
+                          <span>{lots.toFixed(2)} lots</span>
+                          <span>{pnl >= 0 ? "+$" : "-$"}{Math.abs(pnl).toFixed(2)}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-gray-400">
-                        <span>{(Math.random() * 2 + 0.5).toFixed(2)} lots</span>
-                        <span>{i % 2 === 0 ? "+$" : "-$"}{(Math.random() * 500 + 50).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -153,18 +147,22 @@ export default function TradingDashboard() {
               <div className="bg-gray-900 rounded-lg p-3">
                 <h4 className="text-white font-medium text-sm mb-3">Pending Orders</h4>
                 <div className="space-y-2">
-                  {Array.from({ length: 3 }, (_, i) => (
-                    <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-medium">GBP/USD</span>
-                        <span className="text-gray-400">PENDING</span>
+                  {Array.from({ length: 3 }, (_, i) => {
+                    const lots = [0.75, 1.20, 0.95][i]
+                    const price = [1.2650, 1.2725, 1.2580][i]
+                    return (
+                      <div key={i} className="p-2 bg-gray-800 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-medium">GBP/USD</span>
+                          <span className="text-gray-400">PENDING</span>
+                        </div>
+                        <div className="flex justify-between text-gray-400">
+                          <span>{lots.toFixed(2)} lots</span>
+                          <span>@ {price.toFixed(5)}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-gray-400">
-                        <span>{(Math.random() * 1 + 0.5).toFixed(2)} lots</span>
-                        <span>@ {(1.25 + Math.random() * 0.1).toFixed(5)}</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -50,10 +50,15 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
             connectionError: null 
           })
           
-          // Auto-subscribe to EUR/USD when connected
+          // Subscribe to current selected symbol when connected
           setTimeout(() => {
-            wsService?.subscribe('EUR/USD', 5)
-            set({ currentSymbol: 'EUR/USD' })
+            const marketStore = require('./market').useMarketStore.getState()
+            const currentSelectedSymbol = marketStore.selectedSymbol
+            if (currentSelectedSymbol) {
+              console.log(`WebSocket connected: Subscribing to current selected symbol: ${currentSelectedSymbol}`)
+              wsService?.subscribe(currentSelectedSymbol, 5)
+              set({ currentSymbol: currentSelectedSymbol })
+            }
           }, 500) // Small delay to ensure connection is stable
         })
 
@@ -81,7 +86,8 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
               ...state.orderBookData,
               [orderBookData.symbol]: orderBookData
             },
-            lastUpdate: Date.now()
+            lastUpdate: Date.now(),
+            connectionError: null // Clear any previous connection errors when we receive data
           }))
         })
 
@@ -126,6 +132,9 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
         return
       }
 
+      // Clear any previous connection errors when attempting new subscription
+      set({ connectionError: null })
+
       // If switching to a different symbol, unsubscribe from current first
       if (state.currentSymbol && state.currentSymbol !== symbol) {
         console.log(`Unsubscribing from ${state.currentSymbol}`)
@@ -139,8 +148,8 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
         })
       }
 
-      // Subscribe to new symbol
-      console.log(`Subscribing to ${symbol} with ${levels} levels`)
+      // Subscribe to new symbol - preserve exact case
+      console.log(`Subscribing to symbol: "${symbol}" (exact case preserved)`)
       state.wsService.subscribe(symbol, levels)
       set({ currentSymbol: symbol })
     },

@@ -105,7 +105,7 @@ class HistoricalBarsRequest(BaseModel):
     def validate_symbol(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError("Symbol cannot be empty")
-        return v.strip().upper()
+        return v.strip()
 
     @validator("to_time", pre=True, always=True)
     def set_default_to_time(cls, v):
