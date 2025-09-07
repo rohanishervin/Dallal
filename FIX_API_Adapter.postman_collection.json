@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
 		"name": "FIX API Adapter - Complete Collection",
-		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **NEW: WebSocket orderbook streaming**\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **WebSocket Orderbook**: Real-time orderbook streaming with subscription management\n- **Historical Bars**: Get OHLCV price data with configurable time periods\n- **Multiple timeframes**: Support for S1, S10, M1, M5, M15, M30, H1, H4, D1, W1, MN1\n- **Bid/Ask pricing**: Choose between Bid or Ask prices\n- **Comprehensive validation**: Proper error handling and data validation\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **NEW: Complete Trading System** 🎯\n  - Market orders (immediate execution)\n  - Limit orders (execute at specified price)\n  - Stop orders (trigger at stop price)\n  - Stop-limit orders (trigger + limit protection)\n  - Order cancellation and modification\n- WebSocket orderbook streaming\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **🚀 COMPLETE TRADING SYSTEM**: All 4 order types with full FIX protocol integration\n- **📊 Order Management**: Cancel and modify pending orders\n- **🛡️ Advanced Features**: Stop loss, take profit, time-in-force options\n- **💼 Order Metadata**: Comments, tags, magic numbers for order tracking\n- **⚡ Process Isolation**: Thread-safe QuickFIX integration\n- **🔒 Security**: JWT authentication with comprehensive validation\n- **WebSocket Orderbook**: Real-time orderbook streaming\n- **Historical Bars**: OHLCV data with multiple timeframes\n\n## Trading Order Types\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "12345678"
 	},
@@ -790,6 +790,786 @@
 			"description": "Market data endpoints for retrieving trading instruments, historical bars, and market information."
 		},
 		{
+			"name": "🎯 Trading System",
+			"item": [
+				{
+					"name": "📊 Order Placement",
+					"item": [
+						{
+							"name": "Market Order - Buy EUR/USD",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Test response status",
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"// Parse response",
+											"const response = pm.response.json();",
+											"",
+											"// Test response structure",
+											"pm.test(\"Response has required fields\", function () {",
+											"    pm.expect(response).to.have.property('success');",
+											"    pm.expect(response).to.have.property('client_order_id');",
+											"    pm.expect(response).to.have.property('message');",
+											"    pm.expect(response).to.have.property('timestamp');",
+											"});",
+											"",
+											"// Log order results",
+											"if (response.success) {",
+											"    pm.test(\"Market order placed successfully\", function () {",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.order_id).to.be.a('string');",
+											"    });",
+											"    ",
+											"    console.log(\"✅ Market Order Successful!\");",
+											"    console.log(\"📋 Client Order ID:\", response.client_order_id);",
+											"    console.log(\"🆔 Server Order ID:\", response.order_id);",
+											"    console.log(\"💬 Message:\", response.message);",
+											"    ",
+											"    // Save order ID for potential cancellation",
+											"    if (response.order_id) {",
+											"        pm.environment.set(\"last_order_id\", response.order_id);",
+											"        pm.environment.set(\"last_client_order_id\", response.client_order_id);",
+											"        console.log(\"💾 Order ID saved for potential operations\");",
+											"    }",
+											"    ",
+											"    // Log execution report if available",
+											"    if (response.execution_report) {",
+											"        const exec = response.execution_report;",
+											"        console.log(\"📊 Execution Report:\");",
+											"        console.log(`  Status: ${exec.order_status} | Type: ${exec.exec_type}`);",
+											"        console.log(`  Quantity: ${exec.order_qty} | Filled: ${exec.cum_qty} | Remaining: ${exec.leaves_qty}`);",
+											"        if (exec.avg_price) console.log(`  Average Price: ${exec.avg_price}`);",
+											"    }",
+											"} else {",
+											"    pm.test(\"Market order failed as expected\", function () {",
+											"        pm.expect(response.success).to.be.false;",
+											"        pm.expect(response.error).to.be.a('string');",
+											"    });",
+											"    console.log(\"❌ Market Order Failed:\", response.error);",
+											"    console.log(\"💬 Message:\", response.message);",
+											"}",
+											"",
+											"console.log(\"📋 Full Response:\", JSON.stringify(response, null, 2));"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"1\",\n  \"quantity\": 0.01,\n  \"stop_loss\": 1.0800,\n  \"take_profit\": 1.1000,\n  \"comment\": \"Postman market order test\",\n  \"tag\": \"POSTMAN_TEST\",\n  \"magic\": 12345,\n  \"slippage\": 2.0\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/market",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"market"
+									]
+								},
+								"description": "Place a market order for immediate execution at current market price.\n\n**Market Orders:**\n- Execute immediately at best available price\n- No price specification needed\n- Best for quick entry/exit when speed matters more than price\n\n**Parameters:**\n- `symbol`: Currency pair (e.g., \"EUR/USD\")\n- `side`: \"1\" = Buy, \"2\" = Sell\n- `quantity`: Order size (positive number)\n- `stop_loss`: Optional stop loss price\n- `take_profit`: Optional take profit price\n- `comment`: Optional order comment (max 512 chars)\n- `tag`: Optional order tag (max 128 chars)\n- `magic`: Optional magic number for identification\n- `slippage`: Optional slippage tolerance\n\n**FIX Protocol:** Sends New Order Single (D) message with OrdType=1"
+							},
+							"response": []
+						},
+						{
+							"name": "Limit Order - Buy EUR/USD",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Test response status",
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test(\"Response has required fields\", function () {",
+											"    pm.expect(response).to.have.property('success');",
+											"    pm.expect(response).to.have.property('client_order_id');",
+											"});",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Limit Order Placed Successfully!\");",
+											"    console.log(\"📋 Client Order ID:\", response.client_order_id);",
+											"    console.log(\"🆔 Server Order ID:\", response.order_id);",
+											"    console.log(\"💰 Limit Price: 1.0850 (below current market)\");",
+											"    ",
+											"    // Save for potential modification/cancellation",
+											"    if (response.order_id) {",
+											"        pm.environment.set(\"last_limit_order_id\", response.order_id);",
+											"        pm.environment.set(\"last_limit_client_order_id\", response.client_order_id);",
+											"    }",
+											"} else {",
+											"    console.log(\"❌ Limit Order Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"1\",\n  \"quantity\": 0.01,\n  \"price\": 1.0850,\n  \"time_in_force\": \"1\",\n  \"stop_loss\": 1.0800,\n  \"take_profit\": 1.0900,\n  \"comment\": \"Postman limit order - buy below market\",\n  \"tag\": \"LIMIT_TEST\",\n  \"immediate_or_cancel\": false,\n  \"max_visible_qty\": 0.005\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/limit",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"limit"
+									]
+								},
+								"description": "Place a limit order to execute at specified price or better.\n\n**Limit Orders:**\n- Execute only at specified price or better\n- Remain pending until price is reached or order expires\n- Good for precise entry/exit prices\n\n**Parameters:**\n- `price`: Limit price (required)\n- `time_in_force`: \"1\"=GTC, \"3\"=IOC, \"6\"=GTD\n- `expire_time`: Required for GTD orders\n- `max_visible_qty`: For iceberg orders\n- `immediate_or_cancel`: IOC flag for limit orders\n- `market_with_slippage`: Market with slippage protection\n\n**FIX Protocol:** Sends New Order Single (D) with OrdType=2"
+							},
+							"response": []
+						},
+						{
+							"name": "Stop Order - Sell EUR/USD",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Stop Order Placed Successfully!\");",
+											"    console.log(\"📋 Client Order ID:\", response.client_order_id);",
+											"    console.log(\"🛑 Stop Price: 1.0800 (below current market)\");",
+											"    console.log(\"💡 Will become market order when triggered\");",
+											"    ",
+											"    if (response.order_id) {",
+											"        pm.environment.set(\"last_stop_order_id\", response.order_id);",
+											"    }",
+											"} else {",
+											"    console.log(\"❌ Stop Order Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"2\",\n  \"quantity\": 0.01,\n  \"stop_price\": 1.0800,\n  \"time_in_force\": \"1\",\n  \"comment\": \"Postman stop order - sell if price drops\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/stop",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"stop"
+									]
+								},
+								"description": "Place a stop order that becomes market order when stop price is reached.\n\n**Stop Orders:**\n- Trigger when market reaches stop price\n- Become market orders after trigger\n- Used for stop losses or breakout strategies\n\n**Parameters:**\n- `stop_price`: Stop trigger price (required)\n- Use for stop losses or breakout entries\n- No price protection after trigger\n\n**FIX Protocol:** Sends New Order Single (D) with OrdType=3"
+							},
+							"response": []
+						},
+						{
+							"name": "Stop-Limit Order - Sell EUR/USD",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Stop-Limit Order Placed Successfully!\");",
+											"    console.log(\"📋 Client Order ID:\", response.client_order_id);",
+											"    console.log(\"🛑 Stop Price: 1.0800 (trigger level)\");",
+											"    console.log(\"💰 Limit Price: 1.0790 (execution price)\");",
+											"    console.log(\"💡 Will become limit order when triggered\");",
+											"    ",
+											"    if (response.order_id) {",
+											"        pm.environment.set(\"last_stop_limit_order_id\", response.order_id);",
+											"    }",
+											"} else {",
+											"    console.log(\"❌ Stop-Limit Order Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"2\",\n  \"quantity\": 0.01,\n  \"stop_price\": 1.0800,\n  \"price\": 1.0790,\n  \"time_in_force\": \"1\",\n  \"comment\": \"Postman stop-limit order with price protection\",\n  \"immediate_or_cancel\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/stop-limit",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"stop-limit"
+									]
+								},
+								"description": "Place a stop-limit order with trigger and execution price protection.\n\n**Stop-Limit Orders:**\n- Trigger when market reaches stop price\n- Become limit orders at specified limit price\n- Provide price protection after trigger\n\n**Parameters:**\n- `stop_price`: Stop trigger price (required)\n- `price`: Limit price after trigger (required)\n- Best of both worlds: trigger + price protection\n\n**FIX Protocol:** Sends New Order Single (D) with OrdType=4"
+							},
+							"response": []
+						},
+						{
+							"name": "Generic Order - All Types",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Generic Order Placed Successfully!\");",
+											"    console.log(\"📋 Order Type: Limit (2)\");",
+											"    console.log(\"💰 Price: 1.0860\");",
+											"} else {",
+											"    console.log(\"❌ Generic Order Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"order_type\": \"2\",\n  \"side\": \"1\",\n  \"quantity\": 0.01,\n  \"price\": 1.0860,\n  \"stop_price\": null,\n  \"time_in_force\": \"1\",\n  \"comment\": \"Generic endpoint test - limit order\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders"
+									]
+								},
+								"description": "Generic order placement endpoint - accepts any order type.\n\n**Order Types:**\n- \"1\" = Market Order\n- \"2\" = Limit Order\n- \"3\" = Stop Order\n- \"4\" = Stop-Limit Order\n\n**Recommendation:** Use specific endpoints for better validation and documentation."
+							},
+							"response": []
+						}
+					],
+					"description": "Order placement endpoints for all trading order types."
+				},
+				{
+					"name": "🔧 Order Management",
+					"item": [
+						{
+							"name": "Cancel Order",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Order Cancel Request Sent!\");",
+											"    console.log(\"📋 Cancel Order ID:\", response.client_order_id);",
+											"    console.log(\"🎯 Target Order:\", response.order_id);",
+											"    console.log(\"💬 Message:\", response.message);",
+											"} else {",
+											"    console.log(\"❌ Order Cancel Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"// Check if we have a saved order ID to cancel",
+											"const lastOrderId = pm.environment.get(\"last_limit_order_id\");",
+											"if (!lastOrderId) {",
+											"    console.warn(\"⚠️  No saved order ID found. Place a limit order first to test cancellation.\");",
+											"    console.warn(\"💡 Using example order ID 'ORDER123' for demonstration.\");",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/trading/orders/{{last_limit_order_id}}?symbol=EUR/USD&side=1&original_client_order_id={{last_limit_client_order_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"{{last_limit_order_id}}"
+									],
+									"query": [
+										{
+											"key": "symbol",
+											"value": "EUR/USD",
+											"description": "Currency pair of original order"
+										},
+										{
+											"key": "side",
+											"value": "1",
+											"description": "Side of original order (1=Buy, 2=Sell)"
+										},
+										{
+											"key": "original_client_order_id",
+											"value": "{{last_limit_client_order_id}}",
+											"description": "Optional: Original client order ID"
+										}
+									]
+								},
+								"description": "Cancel a pending order by server order ID.\n\n**Requirements:**\n- Order must be in pending status (not filled/cancelled)\n- Must provide original order details for validation\n\n**Parameters:**\n- `order_id`: Server-assigned order ID (in URL path)\n- `symbol`: Currency pair of original order\n- `side`: Original order side (\"1\"=Buy, \"2\"=Sell)\n- `original_client_order_id`: Optional client order ID\n\n**FIX Protocol:** Sends Order Cancel Request (F) message\n\n**Note:** This uses the saved order ID from previous limit order. Place a limit order first!"
+							},
+							"response": []
+						},
+						{
+							"name": "Modify Order",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    console.log(\"✅ Order Modify Request Sent!\");",
+											"    console.log(\"📋 Modify Order ID:\", response.client_order_id);",
+											"    console.log(\"🎯 Target Order:\", response.order_id);",
+											"    console.log(\"💰 New Price: 1.0870\");",
+											"    console.log(\"📊 New Quantity: 0.02\");",
+											"} else {",
+											"    console.log(\"❌ Order Modify Failed:\", response.error);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"1\",\n  \"original_client_order_id\": \"{{last_limit_client_order_id}}\",\n  \"new_quantity\": 0.02,\n  \"new_price\": 1.0870,\n  \"new_stop_loss\": 1.0820,\n  \"new_take_profit\": 1.0920,\n  \"new_comment\": \"Modified via Postman - increased size and price\",\n  \"leaves_qty\": 0.01\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/{{last_limit_order_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"{{last_limit_order_id}}"
+									]
+								},
+								"description": "Modify a pending order's parameters.\n\n**Modifiable Fields:**\n- `new_quantity`: New order size\n- `new_price`: New limit price\n- `new_stop_price`: New stop price\n- `new_stop_loss`: New stop loss level\n- `new_take_profit`: New take profit level\n- `new_time_in_force`: New time in force\n- `new_expire_time`: New expiration time\n- `new_comment`: New order comment\n- `new_tag`: New order tag\n- `leaves_qty`: Expected remaining qty (validation)\n\n**Requirements:**\n- At least one field must be modified\n- Order must be in pending status\n\n**FIX Protocol:** Sends Order Cancel/Replace Request (G)\n\n**Note:** Uses saved order ID from limit order test."
+							},
+							"response": []
+						}
+					],
+					"description": "Order management endpoints for cancelling and modifying pending orders."
+				},
+				{
+					"name": "📊 Order Examples",
+					"item": [
+						{
+							"name": "Order with Stop Loss & Take Profit",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"1\",\n  \"quantity\": 0.01,\n  \"stop_loss\": 1.0800,\n  \"take_profit\": 1.1000,\n  \"comment\": \"Market order with risk management\",\n  \"tag\": \"SL_TP_TEST\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/market",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"market"
+									]
+								},
+								"description": "Example: Market order with stop loss and take profit.\n\n**Risk Management:**\n- Stop Loss: 1.0800 (limits downside risk)\n- Take Profit: 1.1000 (secures profit target)\n- Automatic execution when levels are hit"
+							},
+							"response": []
+						},
+						{
+							"name": "Limit Order with Time in Force",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"GBP/USD\",\n  \"side\": \"2\",\n  \"quantity\": 0.02,\n  \"price\": 1.2500,\n  \"time_in_force\": \"6\",\n  \"expire_time\": \"2024-12-31T23:59:59\",\n  \"comment\": \"Good Till Date limit order\",\n  \"immediate_or_cancel\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/limit",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"limit"
+									]
+								},
+								"description": "Example: Limit order with Good Till Date (GTD) time in force.\n\n**Time in Force Options:**\n- \"1\" = Good Till Cancel (GTC) - Default\n- \"3\" = Immediate or Cancel (IOC)\n- \"6\" = Good Till Date (GTD) - Requires expire_time"
+							},
+							"response": []
+						},
+						{
+							"name": "Iceberg Order (Hidden Quantity)",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{auth_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"symbol\": \"EUR/USD\",\n  \"side\": \"1\",\n  \"quantity\": 0.10,\n  \"price\": 1.0850,\n  \"max_visible_qty\": 0.01,\n  \"comment\": \"Iceberg order - only 0.01 visible at a time\",\n  \"tag\": \"ICEBERG_TEST\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/trading/orders/limit",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"limit"
+									]
+								},
+								"description": "Example: Iceberg order with hidden quantity.\n\n**Iceberg Orders:**\n- Total quantity: 0.10\n- Visible quantity: 0.01\n- Hides large orders to reduce market impact\n- Reveals more quantity as visible portion is filled"
+							},
+							"response": []
+						}
+					],
+					"description": "Example orders demonstrating advanced features and use cases."
+				},
+				{
+					"name": "🏥 Trading Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"Trading service is healthy\", function () {",
+									"    pm.expect(response.status).to.eql(\"healthy\");",
+									"    pm.expect(response.service).to.eql(\"trading\");",
+									"});",
+									"",
+									"console.log(\"💚 Trading Service Status:\", response.status);",
+									"console.log(\"🎯 Service:\", response.service);",
+									"console.log(\"💬 Message:\", response.message);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/trading/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"trading",
+								"health"
+							]
+						},
+						"description": "Health check for trading service - no authentication required."
+					},
+					"response": [
+						{
+							"name": "Trading Service Healthy",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/trading/health",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"health"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"status\": \"healthy\",\n    \"service\": \"trading\",\n    \"message\": \"Trading service is operational\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Complete trading system with all order types, management capabilities, and advanced features.\n\n## 🎯 Order Types Available\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## 🛡️ Advanced Features\n- **Stop Loss & Take Profit**: Automatic risk management\n- **Time in Force**: GTC, IOC, GTD options\n- **Iceberg Orders**: Hide large order quantities\n- **Order Metadata**: Comments, tags, magic numbers\n- **Order Management**: Cancel and modify pending orders\n\n## 🔧 Order Management\n- **Cancel Orders**: Cancel pending orders by ID\n- **Modify Orders**: Change price, quantity, stop levels\n- **Order Tracking**: Client and server order IDs\n\n## 🔒 Security & Validation\n- **JWT Authentication**: Required for all trading endpoints\n- **Input Validation**: Comprehensive parameter validation\n- **FIX Protocol**: Full integration with New Order Single (D) messages\n- **Process Isolation**: Thread-safe QuickFIX implementation\n\n## 📊 Testing Workflow\n1. **Login** to get authentication token\n2. **Place Orders** using various order types\n3. **Monitor** via session status\n4. **Manage Orders** (cancel/modify as needed)\n5. **Check Health** of trading service\n\n## 💡 Tips\n- Order IDs are automatically saved for management operations\n- Use realistic prices based on current market levels\n- Test with small quantities (0.01) for safety\n- Check execution reports for order status details"
+		},
+		{
 			"name": "🔌 WebSocket Orderbook",
 			"item": [
 				{
@@ -1123,10 +1903,11 @@
 					"",
 					"// Check if auth token exists for protected endpoints",
 					"const authToken = pm.environment.get(\"auth_token\");",
-					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\") || pm.request.url.toString().includes(\"/ws\");",
+					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\") || pm.request.url.toString().includes(\"/ws\") || pm.request.url.toString().includes(\"/trading\");",
 					"",
 					"if (isProtectedEndpoint && !authToken) {",
 					"    console.warn(\"⚠️  This endpoint requires authentication. Run the Login request first.\");",
+					"    console.warn(\"🎯 Trading endpoints require valid JWT token for security.\");",
 					"}"
 				]
 			}

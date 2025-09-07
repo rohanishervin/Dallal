@@ -63,6 +63,219 @@ FIXServiceRunner (separate process) → QuickFIX Adapter → FIX Server
 
 ---
 
+## Centralized FIX Translation System
+
+### 🎯 **System Architecture Overview**
+
+The FIX API Adapter uses a **centralized translation system** that serves as the single source of truth for converting FIX protocol codes into modern, user-friendly API responses. This ensures consistency across the entire application and makes future development maintainable.
+
+### 📁 **Core Translation Module**
+
+**Location**: `backend/src/core/fix_translation_system.py`
+
+This module contains the `FIXTranslationSystem` class which provides all FIX-to-modern translations. **All modules that need FIX translation must use this system.**
+
+### 🔄 **Translation Mappings**
+
+#### **Order Status Translation**
+```python
+FIX_STATUS_MAP = {
+    "0": "pending",        # New
+    "1": "partial",        # Partially filled
+    "2": "filled",         # Filled
+    "3": "filled",         # Done (treat as filled)
+    "4": "cancelled",      # Cancelled
+    "6": "cancelling",     # Pending cancel
+    "8": "rejected",       # Rejected
+    "B": "pending",        # Calculated (treat as pending)
+    "C": "expired",        # Expired
+    "E": "modifying",      # Pending replacement
+    "F": "cancelling",     # Pending close
+}
+```
+
+#### **Rejection Reason Translation**
+```python
+FIX_REJECTION_MAP = {
+    "0": "market_closed",           # Dealer reject
+    "1": "invalid_symbol",          # Unknown symbol
+    "3": "order_limits_exceeded",   # Order exceeds limits
+    "4": "invalid_price",           # Off quotes
+    "5": "system_error",            # Unknown order
+    "6": "duplicate_order",         # Duplicate order
+    "11": "unsupported_order",      # Unsupported characteristics
+    "13": "invalid_quantity",       # Incorrect quantity
+    "16": "rate_limit_exceeded",    # Throttling
+    "17": "timeout",                # Timeout
+    "18": "market_closed",          # Close only
+    "99": "other",                  # Other
+}
+```
+
+#### **Order Type Translation**
+```python
+FIX_ORDER_TYPE_MAP = {
+    "1": "market",      # Market
+    "2": "limit",       # Limit
+    "3": "stop",        # Stop
+    "4": "stop_limit",  # Stop-Limit
+}
+```
+
+#### **Side Translation**
+```python
+FIX_SIDE_MAP = {
+    "1": "buy",   # Buy
+    "2": "sell",  # Sell
+}
+```
+
+#### **Time in Force Translation**
+```python
+FIX_TIF_MAP = {
+    "1": "gtc",  # Good Till Cancel
+    "3": "ioc",  # Immediate or Cancel
+    "6": "gtd",  # Good Till Date
+}
+```
+
+### 🏗️ **Usage in Development**
+
+#### **For New Features**
+When adding new FIX-related functionality, always use the centralized system:
+
+```python
+from src.core.fix_translation_system import FIXTranslationSystem
+
+# Translate individual fields
+modern_status = FIXTranslationSystem.translate_order_status("8")  # Returns "rejected"
+modern_reason = FIXTranslationSystem.translate_rejection_reason("0")  # Returns "market_closed"
+
+# Convert complete FIX data
+fix_data = {"order_status": "8", "reject_reason": "0", "symbol": "EUR/USD"}
+converted = FIXTranslationSystem.convert_fix_order_data(fix_data)
+# Returns: {"modern_status": "rejected", "modern_rejection": "market_closed", ...}
+
+# Generate human-readable messages
+message = FIXTranslationSystem.generate_status_message("rejected", fix_data)
+# Returns: "Market is currently closed for trading. Server details: ..."
+```
+
+#### **For Market Data Features**
+Future market data implementations should extend the translation system:
+
+```python
+# Add to FIXTranslationSystem class
+MARKET_DATA_STATUS_MAP = {
+    "0": "subscribed",
+    "1": "unsubscribed", 
+    "2": "rejected"
+}
+
+@classmethod
+def translate_market_data_status(cls, fix_status: str) -> str:
+    return cls.MARKET_DATA_STATUS_MAP.get(fix_status, "unknown")
+```
+
+### 🔒 **System Integrity**
+
+#### **Validation Method**
+The system includes integrity validation that runs automatically on startup:
+
+```python
+# Called during application startup in main.py
+if not FIXTranslationSystem.validate_translation_integrity():
+    raise RuntimeError("FIX Translation System integrity check failed! System cannot start.")
+```
+
+**What the validation checks:**
+- All modern order status enums have descriptions
+- All rejection reason enums have descriptions  
+- All FIX mapping dictionaries are non-empty
+- All mapped values are valid enum instances
+- System consistency and completeness
+
+**If validation fails:**
+- Application startup is halted
+- Error details are logged
+- System integrity is preserved
+
+#### **Consistency Rules**
+1. **Single Source of Truth**: All FIX translations go through this system
+2. **Enum Centralization**: All modern enums are defined in the translation system
+3. **Backward Compatibility**: New translations must not break existing mappings
+4. **Complete Coverage**: All possible FIX codes must have modern equivalents
+
+### 📊 **Integration Points**
+
+#### **Current Integrations**
+1. **Trading Service** (`trading_service.py`) - All order responses
+2. **Modern Response Converter** (`modern_response_converter.py`) - Response formatting
+3. **Trading Schemas** (`modern_trading_schemas.py`) - Import centralized enums
+4. **Trading Router** (`trading_router.py`) - API documentation endpoint
+
+#### **Future Integration Points**
+1. **Market Data Service** - Real-time quotes and subscriptions
+2. **Position Service** - Position status and management
+3. **WebSocket Service** - Real-time updates
+4. **History Service** - Trade and order history
+
+### 🛠️ **Extending the System**
+
+#### **Adding New FIX Message Types**
+1. Add translation mappings to `FIXTranslationSystem`
+2. Create corresponding modern enums
+3. Add validation to `validate_translation_integrity()`
+4. Update documentation in this handbook
+
+#### **Example: Adding Position Status Translation**
+```python
+# In FIXTranslationSystem class
+POSITION_STATUS_MAP = {
+    "1": "open",
+    "2": "closed", 
+    "3": "closing"
+}
+
+@classmethod
+def translate_position_status(cls, fix_status: str) -> str:
+    return cls.POSITION_STATUS_MAP.get(fix_status, "unknown")
+```
+
+### ⚠️ **Development Guidelines**
+
+#### **DO:**
+- Always use `FIXTranslationSystem` for FIX code translation
+- Add new translations to the centralized system
+- Update validation when adding new mappings
+- Document new translations in this handbook
+- Test translation integrity during development
+
+#### **DON'T:**
+- Create separate translation mappings in other modules
+- Hardcode FIX codes in business logic
+- Expose FIX codes in API responses
+- Skip validation when adding new translations
+- Create duplicate enum definitions
+
+### 🔧 **Maintenance**
+
+#### **Regular Tasks**
+1. **Review Mappings**: Ensure all FIX codes have modern equivalents
+2. **Update Documentation**: Keep this handbook current with changes
+3. **Validate Integrity**: Run validation tests with each deployment
+4. **Monitor Usage**: Ensure all modules use the centralized system
+
+#### **Version Control**
+- All translation changes must be reviewed
+- Breaking changes require version updates
+- New FIX codes should be added promptly
+- Deprecated codes should be marked but preserved
+
+This centralized system ensures that the FIX API Adapter maintains consistency and integrity as it grows, making it easy for future developers to understand and extend the translation capabilities.
+
+---
+
 ## Technology Stack
 
 ### Backend (Current)
@@ -152,19 +365,35 @@ quickfix-ssl==1.15.1
 - [x] **QuickFIX configuration management with external .cfg files**
 - [x] **Process lifecycle management and monitoring**
 - [x] **CFD leverage information in instruments endpoint** (margin calculation modes, leverage ratios)
+- [x] **Complete trading functionality implementation**
+  - [x] Market orders (immediate execution)
+  - [x] Limit orders (execute at specified price or better)
+  - [x] Stop orders (trigger at stop price, then market order)
+  - [x] Stop-limit orders (trigger at stop price, then limit order)
+  - [x] Order cancellation and modification
+  - [x] Comprehensive order validation and error handling
+  - [x] Stop loss and take profit support
+  - [x] Time in force options (GTC, IOC, GTD)
+  - [x] Order metadata (comments, tags, magic numbers)
+  - [x] Process-isolated trading via FIX trade sessions
+  - [x] **Human-readable FIX response parsing and translation**
+  - [x] Enhanced error messages with detailed explanations
+  - [x] FIX code translation (order status, execution types, reject reasons)
 
 ### 🚧 Current Work
-- [ ] Testing the new QuickFIX architecture with real FIX credentials
+- [x] **Modern API Response System** - Complete abstraction from FIX protocol
+- [x] **Centralized FIX Translation System** - Single source of truth for all translations
+- [ ] Testing the new modern trading endpoints with real FIX credentials  
 - [ ] Implementing Market Data Request for real-time quotes
-- [ ] Optimizing process isolation performance
+- [ ] Order status tracking and real-time updates
 
 ### 📋 Planned Features
 - [ ] Market Data Request (real-time streaming quotes)
-- [ ] Order management (place, cancel, modify orders)
-- [ ] WebSocket real-time feeds
-- [ ] Position tracking
-- [ ] Risk management
-- [ ] Frontend dashboard application
+- [ ] WebSocket real-time feeds for order updates
+- [ ] Position tracking and management
+- [ ] Order history and trade reporting
+- [ ] Risk management and position limits
+- [ ] Frontend trading dashboard
 - [ ] Docker containerization
 
 ---
@@ -447,17 +676,509 @@ Authorization: Bearer <jwt_token>
 }
 ```
 
+### Trading Endpoints
+
+#### Order Placement
+
+**POST /trading/orders/market** - Place Market Order
+Place a market order for immediate execution at the current market price.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "side": "1",
+  "quantity": 0.01,
+  "stop_loss": 1.0500,
+  "take_profit": 1.1000,
+  "comment": "Market order comment",
+  "tag": "ORDER_TAG",
+  "magic": 12345,
+  "slippage": 2.0
+}
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "client_order_id": "ORD_1640995200000000",
+  "order_id": "server_order_id",
+  "execution_report": {
+    "order_id": "server_order_id",
+    "client_order_id": "ORD_1640995200000000",
+    "exec_id": "exec_123",
+    "order_status": "2",
+    "exec_type": "F",
+    "symbol": "EUR/USD",
+    "side": "1",
+    "order_type": "1",
+    "cum_qty": 0.01,
+    "order_qty": 0.01,
+    "leaves_qty": 0.0,
+    "avg_price": 1.08950,
+    "order_status_description": "Filled",
+    "exec_type_description": "Trade (Filled/Partially Filled)",
+    "order_type_description": "Market Order",
+    "side_description": "Buy",
+    "human_readable_summary": "Market Order buy order for 0.01 EUR/USD was filled at average price 1.08950"
+  },
+  "message": "Order executed successfully: Market Order buy order for 0.01 EUR/USD was filled at average price 1.08950",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+**POST /trading/orders/limit** - Place Limit Order
+Place a limit order to execute at a specified price or better.
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "side": "1",
+  "quantity": 0.01,
+  "price": 1.0850,
+  "time_in_force": "1",
+  "stop_loss": 1.0800,
+  "take_profit": 1.0900,
+  "immediate_or_cancel": false,
+  "max_visible_qty": 0.005
+}
+```
+
+**POST /trading/orders/stop** - Place Stop Order
+Place a stop order that becomes a market order when the stop price is reached.
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "side": "2",
+  "quantity": 0.01,
+  "stop_price": 1.0800,
+  "time_in_force": "1"
+}
+```
+
+**POST /trading/orders/stop-limit** - Place Stop-Limit Order
+Place a stop-limit order that becomes a limit order when the stop price is reached.
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "side": "2",
+  "quantity": 0.01,
+  "stop_price": 1.0800,
+  "price": 1.0790,
+  "immediate_or_cancel": false
+}
+```
+
+**POST /trading/orders** - Generic Order Placement
+Generic endpoint that accepts any order type based on the order_type field.
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "order_type": "2",
+  "side": "1",
+  "quantity": 0.01,
+  "price": 1.0850,
+  "stop_price": 1.0800,
+  "time_in_force": "1"
+}
+```
+
+#### Order Management
+
+**DELETE /trading/orders/{order_id}** - Cancel Order
+Cancel a pending order.
+
+*Query Parameters:*
+- `symbol` (required): Currency pair of the original order
+- `side` (required): Side of the original order ("1" for Buy, "2" for Sell)
+- `original_client_order_id` (optional): Original client order ID
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "client_order_id": "CANCEL_1640995200000000",
+  "order_id": "server_order_id",
+  "message": "Order cancel request sent for server_order_id",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+**PUT /trading/orders/{order_id}** - Modify Order
+Modify a pending order.
+
+*Request Body:*
+```json
+{
+  "symbol": "EUR/USD",
+  "side": "1",
+  "new_quantity": 0.02,
+  "new_price": 1.0860,
+  "new_stop_loss": 1.0810,
+  "new_take_profit": 1.0910,
+  "leaves_qty": 0.01
+}
+```
+
+#### Order Types and Parameters
+
+**Order Types:**
+- `"1"` - Market Order: Immediate execution at current market price
+- `"2"` - Limit Order: Execute at specified price or better
+- `"3"` - Stop Order: Trigger at stop price, then become market order
+- `"4"` - Stop-Limit Order: Trigger at stop price, then become limit order
+
+**Order Sides:**
+- `"1"` - Buy
+- `"2"` - Sell
+
+**Time in Force:**
+- `"1"` - Good Till Cancel (GTC) - Default
+- `"3"` - Immediate or Cancel (IOC) - For Limit and Stop-Limit orders only
+- `"6"` - Good Till Date (GTD) - Requires expire_time
+
+**Order Status Values:**
+- `"0"` - New
+- `"1"` - Partially Filled
+- `"2"` - Filled
+- `"3"` - Done
+- `"4"` - Cancelled
+- `"6"` - Pending Cancel
+- `"8"` - Rejected
+- `"B"` - Calculated
+- `"C"` - Expired
+- `"E"` - Pending Replacement
+- `"F"` - Pending Close
+
+#### Modern API Response System
+
+**🎯 Complete FIX Protocol Abstraction**
+
+The API now provides completely modern responses with **zero FIX protocol exposure**. Users never see cryptic codes or need FIX knowledge.
+
+**Modern Order Statuses:**
+- `pending` - Order accepted, waiting for execution
+- `partial` - Order partially executed
+- `filled` - Order completely executed
+- `cancelled` - Order cancelled by user or system
+- `rejected` - Order rejected by broker/market
+- `expired` - Order expired (GTD orders)
+- `cancelling` - Cancel request in progress
+- `modifying` - Modification request in progress
+
+**Modern Rejection Reasons:**
+- `market_closed` - Trading session is closed
+- `insufficient_funds` - Not enough balance/margin
+- `invalid_symbol` - Unknown trading symbol
+- `invalid_price` - Price outside allowed range
+- `invalid_quantity` - Quantity outside allowed range
+- `order_limits_exceeded` - Too many orders or position limits
+- `rate_limit_exceeded` - Too many requests
+- `timeout` - Order processing timeout
+- `system_error` - Internal system error
+- `other` - Other broker-specific reason
+
+**Modern Rejection Response Example:**
+```json
+{
+  "success": true,
+  "order_id": "0",
+  "client_order_id": "ORD_1757255704625008",
+  "status": "rejected",
+  "status_message": "Market is currently closed for trading. Server details: Trade session is closed for EURUSD&1.",
+  "order_info": {
+    "order_id": "0",
+    "client_order_id": "ORD_1757255704625008",
+    "symbol": "EUR/USD",
+    "order_type": "market",
+    "side": "buy",
+    "original_quantity": 0.01,
+    "created_at": "2025-01-07T14:35:04.743975Z"
+  },
+  "execution_details": null,
+  "rejection_reason": "market_closed",
+  "error_message": null,
+  "timestamp": "2025-01-07T14:35:04.743975Z",
+  "processing_time_ms": 123
+}
+```
+
+**Successful Order Response Example:**
+```json
+{
+  "success": true,
+  "order_id": "12345678",
+  "client_order_id": "ORD_1757255704625008",
+  "status": "filled",
+  "status_message": "Market buy order for 0.01 EUR/USD executed at average price 1.08950",
+  "order_info": {
+    "order_id": "12345678",
+    "symbol": "EUR/USD",
+    "order_type": "market",
+    "side": "buy",
+    "original_quantity": 0.01,
+    "created_at": "2025-01-07T14:35:04.743975Z"
+  },
+  "execution_details": {
+    "executed_quantity": 0.01,
+    "remaining_quantity": 0.0,
+    "average_price": 1.08950,
+    "total_executions": 1
+  },
+  "account_balance": 10000.50,
+  "commission": 0.02,
+  "processing_time_ms": 245
+}
+```
+
+**📚 API Documentation Endpoint:**
+```
+GET /trading/possible-outcomes
+```
+Returns complete documentation of all possible order statuses and rejection reasons.
+
+### Complete API Examples
+
+#### 1. Successful Market Order (Filled Immediately)
+
+**Request:**
+```bash
+POST /trading/orders/market
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "symbol": "EUR/USD",
+  "side": "buy", 
+  "quantity": 0.01,
+  "comment": "Test market order"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "order_id": "12345678",
+  "client_order_id": "ORD_1757255704625008",
+  "status": "filled",
+  "status_message": "Market buy order for 0.01 EUR/USD executed at average price 1.08950",
+  "order_info": {
+    "order_id": "12345678",
+    "client_order_id": "ORD_1757255704625008",
+    "symbol": "EUR/USD",
+    "order_type": "market",
+    "side": "buy",
+    "original_quantity": 0.01,
+    "price": null,
+    "stop_price": null,
+    "time_in_force": "gtc",
+    "expire_time": null,
+    "stop_loss": null,
+    "take_profit": null,
+    "comment": "Test market order",
+    "tag": null,
+    "magic": null,
+    "created_at": "2025-01-07T14:35:04.743975Z",
+    "updated_at": null
+  },
+  "execution_details": {
+    "executed_quantity": 0.01,
+    "remaining_quantity": 0.0,
+    "average_price": 1.08950,
+    "last_execution_price": 1.08950,
+    "last_execution_quantity": 0.01,
+    "total_executions": 1
+  },
+  "rejection_reason": null,
+  "error_message": null,
+  "account_balance": 10000.50,
+  "commission": 0.02,
+  "swap": null,
+  "timestamp": "2025-01-07T14:35:04.743975Z",
+  "processing_time_ms": 245
+}
+```
+
+#### 2. Rejected Market Order (Market Closed)
+
+**Request:**
+```bash
+POST /trading/orders/market
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "symbol": "EUR/USD",
+  "side": "buy",
+  "quantity": 0.01
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "order_id": "0",
+  "client_order_id": "ORD_1757255704625008", 
+  "status": "rejected",
+  "status_message": "Market is currently closed for trading. Server details: Trade session is closed for EURUSD&1.",
+  "order_info": {
+    "order_id": "0",
+    "client_order_id": "ORD_1757255704625008",
+    "symbol": "EUR/USD",
+    "order_type": "market",
+    "side": "buy",
+    "original_quantity": 0.01,
+    "price": null,
+    "stop_price": null,
+    "time_in_force": "gtc",
+    "expire_time": null,
+    "stop_loss": null,
+    "take_profit": null,
+    "comment": null,
+    "tag": null,
+    "magic": null,
+    "created_at": "2025-01-07T14:35:04.743975Z",
+    "updated_at": null
+  },
+  "execution_details": null,
+  "rejection_reason": "market_closed",
+  "error_message": null,
+  "account_balance": null,
+  "commission": null,
+  "swap": null,
+  "timestamp": "2025-01-07T14:35:04.743975Z",
+  "processing_time_ms": 123
+}
+```
+
+#### 3. Pending Limit Order
+
+**Request:**
+```bash
+POST /trading/orders/limit
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "symbol": "EUR/USD",
+  "side": "buy",
+  "quantity": 0.01,
+  "price": 1.0500,
+  "time_in_force": "gtc"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "order_id": "12345679",
+  "client_order_id": "ORD_1757255704625009",
+  "status": "pending", 
+  "status_message": "Limit buy order for 0.01 EUR/USD accepted and pending execution",
+  "order_info": {
+    "order_id": "12345679",
+    "client_order_id": "ORD_1757255704625009",
+    "symbol": "EUR/USD",
+    "order_type": "limit",
+    "side": "buy",
+    "original_quantity": 0.01,
+    "price": 1.0500,
+    "stop_price": null,
+    "time_in_force": "gtc",
+    "expire_time": null,
+    "stop_loss": null,
+    "take_profit": null,
+    "comment": null,
+    "tag": null,
+    "magic": null,
+    "created_at": "2025-01-07T14:35:04.743975Z",
+    "updated_at": null
+  },
+  "execution_details": null,
+  "rejection_reason": null,
+  "error_message": null,
+  "account_balance": 10000.50,
+  "commission": null,
+  "swap": null,
+  "timestamp": "2025-01-07T14:35:04.743975Z",
+  "processing_time_ms": 189
+}
+```
+
+#### 4. Order Cancellation
+
+**Request:**
+```bash
+DELETE /trading/orders/12345679?symbol=EUR/USD&side=buy
+Authorization: Bearer <jwt_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "order_id": "12345679",
+  "client_order_id": "CANCEL_1757255704625011",
+  "operation": "cancel",
+  "status": "cancelling",
+  "status_message": "Order 12345679 cancellation request sent",
+  "error_message": null,
+  "timestamp": "2025-01-07T14:37:00.000000Z"
+}
+```
+
+#### 5. All Order Types Summary
+
+**Available Order Types:**
+- `POST /trading/orders/market` - Market orders (immediate execution)
+- `POST /trading/orders/limit` - Limit orders (execute at price or better)  
+- `POST /trading/orders/stop` - Stop orders (trigger at stop price)
+- `POST /trading/orders/stop-limit` - Stop-limit orders (trigger then limit)
+- `POST /trading/orders` - Generic endpoint (accepts any order type)
+
+**Order Management:**
+- `DELETE /trading/orders/{order_id}` - Cancel pending orders
+- `PUT /trading/orders/{order_id}` - Modify pending orders
+
+**Documentation:**
+- `GET /trading/possible-outcomes` - Get all possible order outcomes
+- `GET /trading/health` - Service health check
+
+#### Health Check
+
+**GET /trading/health** - Trading Service Health Check
+Check if the trading service is operational.
+
+*Response:*
+```json
+{
+  "status": "healthy",
+  "service": "trading",
+  "message": "Trading service is operational"
+}
+```
+
 ### Planned Endpoints
 
 #### Market Data (Future)
 - `GET /market/quotes/{symbol}` - Get current quote
 - `WebSocket /ws/market` - Real-time market data
-
-#### Orders
-- `POST /orders` - Place new order
-- `GET /orders` - List orders
-- `PUT /orders/{id}` - Modify order
-- `DELETE /orders/{id}` - Cancel order
 
 #### Positions
 - `GET /positions` - Get current positions

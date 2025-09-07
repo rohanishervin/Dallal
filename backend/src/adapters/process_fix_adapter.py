@@ -190,6 +190,224 @@ class ProcessFIXAdapter:
         """Async helper for test request"""
         return await fix_process_manager.send_request(self.process_id, "test_request", {}, timeout=5)
 
+    def send_new_order_single(
+        self,
+        user_id: str,
+        client_order_id: str,
+        symbol: str,
+        order_type: str,
+        side: str,
+        quantity: float,
+        price: Optional[float] = None,
+        stop_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        time_in_force: str = "1",
+        expire_time: Optional[datetime] = None,
+        max_visible_qty: Optional[float] = None,
+        comment: Optional[str] = None,
+        tag: Optional[str] = None,
+        magic: Optional[int] = None,
+        immediate_or_cancel: bool = False,
+        market_with_slippage: bool = False,
+        slippage: Optional[float] = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send new order single request via process communication (trade only)"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        if self.connection_type != "trade":
+            return False, None, "Order requests only available on trade connection"
+
+        try:
+            request_data = {
+                "client_order_id": client_order_id,
+                "symbol": symbol,
+                "order_type": order_type,
+                "side": side,
+                "quantity": quantity,
+                "price": price,
+                "stop_price": stop_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "time_in_force": time_in_force,
+                "expire_time": expire_time.isoformat() if expire_time else None,
+                "max_visible_qty": max_visible_qty,
+                "comment": comment,
+                "tag": tag,
+                "magic": magic,
+                "immediate_or_cancel": immediate_or_cancel,
+                "market_with_slippage": market_with_slippage,
+                "slippage": slippage,
+            }
+
+            # Use asyncio to run the async request
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            if loop.is_running():
+                # Create a future and run in thread pool
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        lambda: asyncio.run(
+                            fix_process_manager.send_request(
+                                self.process_id, "new_order_single", request_data, timeout=15
+                            )
+                        )
+                    )
+                    success, data, error = future.result(timeout=20)
+            else:
+                success, data, error = loop.run_until_complete(
+                    fix_process_manager.send_request(self.process_id, "new_order_single", request_data, timeout=15)
+                )
+
+            return success, data, error
+
+        except Exception as e:
+            logger.error(f"New order single request error: {e}")
+            return False, None, f"Request error: {e}"
+
+    def send_order_cancel_request(
+        self,
+        user_id: str,
+        client_order_id: str,
+        original_client_order_id: str,
+        symbol: str,
+        side: str,
+        order_id: Optional[str] = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send order cancel request via process communication (trade only)"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        if self.connection_type != "trade":
+            return False, None, "Order cancel requests only available on trade connection"
+
+        try:
+            request_data = {
+                "client_order_id": client_order_id,
+                "original_client_order_id": original_client_order_id,
+                "symbol": symbol,
+                "side": side,
+                "order_id": order_id,
+            }
+
+            # Use asyncio to run the async request
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            if loop.is_running():
+                # Create a future and run in thread pool
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        lambda: asyncio.run(
+                            fix_process_manager.send_request(self.process_id, "order_cancel", request_data, timeout=15)
+                        )
+                    )
+                    success, data, error = future.result(timeout=20)
+            else:
+                success, data, error = loop.run_until_complete(
+                    fix_process_manager.send_request(self.process_id, "order_cancel", request_data, timeout=15)
+                )
+
+            return success, data, error
+
+        except Exception as e:
+            logger.error(f"Order cancel request error: {e}")
+            return False, None, f"Request error: {e}"
+
+    def send_order_cancel_replace_request(
+        self,
+        user_id: str,
+        client_order_id: str,
+        original_client_order_id: str,
+        symbol: str,
+        side: str,
+        order_type: str,
+        quantity: float,
+        price: Optional[float] = None,
+        stop_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        time_in_force: str = "1",
+        expire_time: Optional[datetime] = None,
+        comment: Optional[str] = None,
+        tag: Optional[str] = None,
+        leaves_qty: Optional[float] = None,
+        order_id: Optional[str] = None,
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send order cancel/replace request via process communication (trade only)"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        if self.connection_type != "trade":
+            return False, None, "Order modify requests only available on trade connection"
+
+        try:
+            request_data = {
+                "client_order_id": client_order_id,
+                "original_client_order_id": original_client_order_id,
+                "symbol": symbol,
+                "side": side,
+                "order_type": order_type,
+                "quantity": quantity,
+                "price": price,
+                "stop_price": stop_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "time_in_force": time_in_force,
+                "expire_time": expire_time.isoformat() if expire_time else None,
+                "comment": comment,
+                "tag": tag,
+                "leaves_qty": leaves_qty,
+                "order_id": order_id,
+            }
+
+            # Use asyncio to run the async request
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            if loop.is_running():
+                # Create a future and run in thread pool
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        lambda: asyncio.run(
+                            fix_process_manager.send_request(self.process_id, "order_modify", request_data, timeout=15)
+                        )
+                    )
+                    success, data, error = future.result(timeout=20)
+            else:
+                success, data, error = loop.run_until_complete(
+                    fix_process_manager.send_request(self.process_id, "order_modify", request_data, timeout=15)
+                )
+
+            return success, data, error
+
+        except Exception as e:
+            logger.error(f"Order modify request error: {e}")
+            return False, None, f"Request error: {e}"
+
     def logout(self) -> bool:
         """Disconnect FIX session by stopping the process"""
         if not self.process_id:

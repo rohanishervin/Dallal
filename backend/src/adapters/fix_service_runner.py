@@ -130,6 +130,12 @@ class FIXServiceProcess:
                     self._handle_market_data_subscribe(request_id, request)
                 elif action == "market_data_unsubscribe":
                     self._handle_market_data_unsubscribe(request_id, request)
+                elif request_type == "new_order_single":
+                    self._handle_new_order_single_request(request_id, request_data)
+                elif request_type == "order_cancel":
+                    self._handle_order_cancel_request(request_id, request_data)
+                elif request_type == "order_modify":
+                    self._handle_order_modify_request(request_id, request_data)
                 else:
                     self._send_error_response(request_id, f"Unknown request type: {request_type or action}")
 
@@ -263,6 +269,148 @@ class FIXServiceProcess:
 
         except Exception as e:
             self._send_error_response(request_id, f"Market data error: {e}")
+
+    def _handle_new_order_single_request(self, request_id: str, request_data: dict):
+        """Handle new order single request (trade adapter only)"""
+        try:
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Order requests only available on trade connection")
+                return
+
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            # Parse datetime if provided
+            expire_time = None
+            if request_data.get("expire_time"):
+                try:
+                    expire_time = datetime.fromisoformat(request_data["expire_time"])
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid expire_time format: {request_data.get('expire_time')}")
+
+            success, data, error = self.adapter.send_new_order_single(
+                client_order_id=request_data["client_order_id"],
+                symbol=request_data["symbol"],
+                order_type=request_data["order_type"],
+                side=request_data["side"],
+                quantity=request_data["quantity"],
+                price=request_data.get("price"),
+                stop_price=request_data.get("stop_price"),
+                stop_loss=request_data.get("stop_loss"),
+                take_profit=request_data.get("take_profit"),
+                time_in_force=request_data.get("time_in_force", "1"),
+                expire_time=expire_time,
+                max_visible_qty=request_data.get("max_visible_qty"),
+                comment=request_data.get("comment"),
+                tag=request_data.get("tag"),
+                magic=request_data.get("magic"),
+                immediate_or_cancel=request_data.get("immediate_or_cancel", False),
+                market_with_slippage=request_data.get("market_with_slippage", False),
+                slippage=request_data.get("slippage"),
+            )
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "type": "new_order_single_response",
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"New order single error: {e}")
+            self._send_error_response(request_id, f"New order single error: {e}")
+
+    def _handle_order_cancel_request(self, request_id: str, request_data: dict):
+        """Handle order cancel request (trade adapter only)"""
+        try:
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Order cancel requests only available on trade connection")
+                return
+
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            success, data, error = self.adapter.send_order_cancel_request(
+                client_order_id=request_data["client_order_id"],
+                original_client_order_id=request_data["original_client_order_id"],
+                symbol=request_data["symbol"],
+                side=request_data["side"],
+                order_id=request_data.get("order_id"),
+            )
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "type": "order_cancel_response",
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Order cancel error: {e}")
+            self._send_error_response(request_id, f"Order cancel error: {e}")
+
+    def _handle_order_modify_request(self, request_id: str, request_data: dict):
+        """Handle order modify request (trade adapter only)"""
+        try:
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Order modify requests only available on trade connection")
+                return
+
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            # Parse datetime if provided
+            expire_time = None
+            if request_data.get("expire_time"):
+                try:
+                    expire_time = datetime.fromisoformat(request_data["expire_time"])
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid expire_time format: {request_data.get('expire_time')}")
+
+            success, data, error = self.adapter.send_order_cancel_replace_request(
+                client_order_id=request_data["client_order_id"],
+                original_client_order_id=request_data["original_client_order_id"],
+                symbol=request_data["symbol"],
+                side=request_data["side"],
+                order_type=request_data["order_type"],
+                quantity=request_data["quantity"],
+                price=request_data.get("price"),
+                stop_price=request_data.get("stop_price"),
+                stop_loss=request_data.get("stop_loss"),
+                take_profit=request_data.get("take_profit"),
+                time_in_force=request_data.get("time_in_force", "1"),
+                expire_time=expire_time,
+                comment=request_data.get("comment"),
+                tag=request_data.get("tag"),
+                leaves_qty=request_data.get("leaves_qty"),
+                order_id=request_data.get("order_id"),
+            )
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "type": "order_modify_response",
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Order modify error: {e}")
+            self._send_error_response(request_id, f"Order modify error: {e}")
 
     def _send_error_response(self, request_id: str, error_msg: str):
         """Send error response"""

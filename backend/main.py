@@ -8,9 +8,11 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from src.config.settings import config
+from src.core.fix_translation_system import FIXTranslationSystem
 from src.routers.auth_router import router as auth_router
 from src.routers.market_router import router as market_router
 from src.routers.session_router import router as session_router
+from src.routers.trading_router import router as trading_router
 from src.routers.websocket_router import router as websocket_router
 from src.services.nats_service import nats_service
 
@@ -41,13 +43,19 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(session_router)
 app.include_router(market_router)
+app.include_router(trading_router)
 app.include_router(websocket_router)
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize NATS connection on startup"""
+    """Initialize services and validate system integrity on startup"""
     logging.info("Starting FIX API Adapter...")
+
+    # Validate FIX translation system integrity
+    if not FIXTranslationSystem.validate_translation_integrity():
+        raise RuntimeError("FIX Translation System integrity check failed! System cannot start.")
+    logging.info("FIX Translation System integrity validated ✓")
 
     # Connect to NATS
     connected = await nats_service.connect()
