@@ -5,6 +5,8 @@ from fastapi.security import HTTPBearer
 
 from ..middleware.auth_middleware import AuthUser, get_current_user
 from ..schemas.modern_trading_schemas import ModernOrderResponse, OrderManagementResponse, PossibleOrderOutcomes
+from ..schemas.orders_schemas import OpenOrdersRequest, OpenOrdersResponse
+from ..schemas.positions_schemas import OpenPositionsRequest, OpenPositionsResponse
 from ..schemas.trading_schemas import (
     LimitOrderRequest,
     MarketOrderRequest,
@@ -14,6 +16,8 @@ from ..schemas.trading_schemas import (
     StopLimitOrderRequest,
     StopOrderRequest,
 )
+from ..services.orders_service import OrdersService
+from ..services.positions_service import PositionsService
 from ..services.session_manager import session_manager
 from ..services.trading_service import TradingService
 
@@ -32,6 +36,30 @@ def get_trading_service(current_user: AuthUser = Depends(get_current_user)) -> T
         )
 
     return TradingService(trade_adapter)
+
+
+def get_orders_service(current_user: AuthUser = Depends(get_current_user)) -> OrdersService:
+    user_id = current_user.user_id
+
+    trade_adapter = session_manager.get_trade_session(user_id)
+    if not trade_adapter:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Trade session not available. Please login first."
+        )
+
+    return OrdersService(trade_adapter)
+
+
+def get_positions_service(current_user: AuthUser = Depends(get_current_user)) -> PositionsService:
+    user_id = current_user.user_id
+
+    trade_adapter = session_manager.get_trade_session(user_id)
+    if not trade_adapter:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Trade session not available. Please login first."
+        )
+
+    return PositionsService(trade_adapter)
 
 
 @router.post("/orders/market", response_model=ModernOrderResponse, summary="Place Market Order")
@@ -385,3 +413,114 @@ async def health_check():
     Check if the trading service is operational.
     """
     return {"status": "healthy", "service": "trading", "message": "Trading service is operational"}
+
+
+@router.get("/orders/open", response_model=OpenOrdersResponse, summary="Get Open Orders")
+async def get_open_orders(
+    current_user: AuthUser = Depends(get_current_user),
+    orders_service: OrdersService = Depends(get_orders_service),
+):
+    """
+    Get all currently open/pending orders.
+
+    This endpoint retrieves all orders that are currently active in the trading system.
+    Orders are retrieved using the FIX Order Mass Status Request (AF) and translated
+    into modern, user-friendly format using the centralized translation system.
+
+    **Order Statuses:**
+    - **pending**: Order accepted, waiting for execution
+    - **partial**: Order partially executed
+    - **filled**: Order completely executed
+    - **cancelled**: Order cancelled by user or system
+    - **rejected**: Order rejected by broker/market
+    - **expired**: Order expired (GTD orders)
+    - **cancelling**: Cancel request in progress
+    - **modifying**: Modification request in progress
+
+    **Response includes:**
+    - Complete list of open orders with modern field names
+    - Summary statistics (orders by status, by symbol)
+    - Human-readable status messages
+    - Processing time and request metadata
+
+    **Authentication required**: JWT token in Authorization header.
+    """
+    try:
+        user_id = current_user.user_id
+        logger.info(f"Open orders request from user {user_id}")
+
+        response = await orders_service.get_open_orders(user_id)
+
+        if response.success:
+            logger.info(f"Retrieved {response.total_orders} open orders for user {user_id}")
+        else:
+            logger.warning(f"Failed to retrieve open orders for user {user_id}: {response.message}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Open orders endpoint error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve open orders: {str(e)}"
+        )
+
+
+@router.get("/positions/open", response_model=OpenPositionsResponse, summary="Get Open Positions")
+async def get_open_positions(
+    current_user: AuthUser = Depends(get_current_user),
+    positions_service: PositionsService = Depends(get_positions_service),
+):
+    """
+    Get all currently open trading positions.
+
+    This endpoint retrieves all positions that are currently open in the trading account.
+    Positions are retrieved using the FIX Request for Positions (AN) and translated
+    into modern, user-friendly format using the centralized translation system.
+
+    **Position Types:**
+    - **long**: Long position (buy)
+    - **short**: Short position (sell)
+    - **net**: Net position (combined long/short)
+
+    **Position Status:**
+    - **open**: Position is currently open
+    - **closed**: Position has been closed
+    - **closing**: Position is being closed
+
+    **Response includes:**
+    - Complete list of open positions with modern field names
+    - Summary statistics (positions by type, by symbol)
+    - Financial summary (total P&L, commission, swap)
+    - Position quantities and average prices
+    - Human-readable status messages
+    - Processing time and request metadata
+
+    **Financial Information:**
+    Each position includes detailed financial data:
+    - Net quantity and long/short breakdown
+    - Average prices for long and short positions
+    - Unrealized and realized profit/loss
+    - Commission and swap charges
+    - Account balance and transaction details
+
+    **Authentication required**: JWT token in Authorization header.
+    """
+    try:
+        user_id = current_user.user_id
+        account_id = current_user.user_id  # Using user_id as account_id for now
+        logger.info(f"Open positions request from user {user_id}")
+
+        response = await positions_service.get_open_positions(user_id, account_id)
+
+        if response.success:
+            logger.info(f"Retrieved {response.total_positions} open positions for user {user_id}")
+        else:
+            logger.warning(f"Failed to retrieve open positions for user {user_id}: {response.message}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Open positions endpoint error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to retrieve open positions: {str(e)}"
+        )

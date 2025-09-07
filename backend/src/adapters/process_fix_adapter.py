@@ -586,3 +586,39 @@ class ProcessFIXAdapter:
         except Exception as e:
             logger.error(f"Error unsubscribing from market data: {e}")
             return False, f"Unsubscription error: {e}"
+
+    async def send_order_mass_status_request(
+        self, user_id: str, request_id: str
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send Order Mass Status Request via process communication"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        if self.connection_type != "trade":
+            return False, None, "Order mass status request only available on trade connection"
+
+        try:
+            return await fix_process_manager.send_order_mass_status_request_async(
+                process_id=self.process_id, user_id=user_id, request_id=request_id
+            )
+        except Exception as e:
+            logger.error(f"Error sending order mass status request: {e}")
+            return False, None, f"Order mass status request error: {e}"
+
+    async def send_request_for_positions(
+        self, user_id: str, request_id: str, account_id: str
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send Request for Positions via process communication"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        if self.connection_type != "trade":
+            return False, None, "Request for positions only available on trade connection"
+
+        try:
+            return await fix_process_manager.send_request_for_positions_async(
+                process_id=self.process_id, user_id=user_id, request_id=request_id, account_id=account_id
+            )
+        except Exception as e:
+            logger.error(f"Error sending request for positions: {e}")
+            return False, None, f"Request for positions error: {e}"

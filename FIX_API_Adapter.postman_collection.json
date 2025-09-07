@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
 		"name": "FIX API Adapter - Complete Collection",
-		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- **Account Information** 💼\n  - Complete account info (all data)\n  - Essential balance (balance, equity, margin, leverage)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **Complete Trading System** 🎯\n  - Market orders (immediate execution)\n  - Limit orders (execute at specified price)\n  - Stop orders (trigger at stop price)\n  - Stop-limit orders (trigger + limit protection)\n  - Order cancellation and modification\n- WebSocket orderbook streaming\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **🚀 COMPLETE TRADING SYSTEM**: All 4 order types with full FIX protocol integration\n- **📊 Order Management**: Cancel and modify pending orders\n- **🛡️ Advanced Features**: Stop loss, take profit, time-in-force options\n- **💼 Order Metadata**: Comments, tags, magic numbers for order tracking\n- **⚡ Process Isolation**: Thread-safe QuickFIX integration\n- **🔒 Security**: JWT authentication with comprehensive validation\n- **WebSocket Orderbook**: Real-time orderbook streaming\n- **Historical Bars**: OHLCV data with multiple timeframes\n\n## Trading Order Types\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- **Account Information** 💼\n  - Complete account info (all data)\n  - Essential balance (balance, equity, margin, leverage)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **Complete Trading System** 🎯\n  - Market orders (immediate execution)\n  - Limit orders (execute at specified price)\n  - Stop orders (trigger at stop price)\n  - Stop-limit orders (trigger + limit protection)\n  - Order cancellation and modification\n- **📊 Open Orders & Positions** ✨ NEW!\n  - Get all open orders with modern API translation\n  - Get all open positions with financial summaries\n  - Complete FIX abstraction with human-readable responses\n- WebSocket orderbook streaming\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## ✨ NEW: Open Orders & Positions Endpoints\n- **📊 GET /trading/orders/open**: Retrieve all currently open orders\n  - Uses FIX Order Mass Status Request (AF) protocol\n  - Modern field names (no FIX codes exposed)\n  - Summary statistics by status and symbol\n  - Complete order details with financial information\n- **📈 GET /trading/positions/open**: Retrieve all currently open positions\n  - Uses FIX Request for Positions (AN) protocol  \n  - Financial summaries and P&L calculations\n  - Position type classification (long/short/net)\n  - Account integration with balance details\n\n## Previous Features\n- **🚀 COMPLETE TRADING SYSTEM**: All 4 order types with full FIX protocol integration\n- **📊 Order Management**: Cancel and modify pending orders\n- **🛡️ Advanced Features**: Stop loss, take profit, time-in-force options\n- **💼 Order Metadata**: Comments, tags, magic numbers for order tracking\n- **⚡ Process Isolation**: Thread-safe QuickFIX integration\n- **🔒 Security**: JWT authentication with comprehensive validation\n- **WebSocket Orderbook**: Real-time orderbook streaming\n- **Historical Bars**: OHLCV data with multiple timeframes\n\n## Trading Order Types\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "12345678"
 	},
@@ -1729,6 +1729,449 @@
 						}
 					],
 					"description": "Example orders demonstrating advanced features and use cases."
+				},
+				{
+					"name": "📊 Open Orders & Positions",
+					"item": [
+						{
+							"name": "Get Open Orders",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Test response status",
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"// Parse response",
+											"const response = pm.response.json();",
+											"",
+											"// Test response structure",
+											"pm.test(\"Response has required fields\", function () {",
+											"    pm.expect(response).to.have.property('success');",
+											"    pm.expect(response).to.have.property('orders');",
+											"    pm.expect(response).to.have.property('total_orders');",
+											"    pm.expect(response).to.have.property('orders_by_status');",
+											"    pm.expect(response).to.have.property('orders_by_symbol');",
+											"    pm.expect(response).to.have.property('message');",
+											"    pm.expect(response).to.have.property('timestamp');",
+											"});",
+											"",
+											"// Test data types",
+											"pm.test(\"Response data types are correct\", function () {",
+											"    pm.expect(response.success).to.be.a('boolean');",
+											"    pm.expect(response.orders).to.be.an('array');",
+											"    pm.expect(response.total_orders).to.be.a('number');",
+											"    pm.expect(response.orders_by_status).to.be.an('object');",
+											"    pm.expect(response.orders_by_symbol).to.be.an('object');",
+											"    pm.expect(response.message).to.be.a('string');",
+											"});",
+											"",
+											"// Test success response",
+											"if (response.success) {",
+											"    console.log(\"✅ Open Orders Retrieved Successfully!\");",
+											"    console.log(\"📊 Total Orders:\", response.total_orders);",
+											"    console.log(\"📋 Orders by Status:\", JSON.stringify(response.orders_by_status, null, 2));",
+											"    console.log(\"📈 Orders by Symbol:\", JSON.stringify(response.orders_by_symbol, null, 2));",
+											"    console.log(\"💬 Message:\", response.message);",
+											"    ",
+											"    // Test order structure if orders exist",
+											"    if (response.orders.length > 0) {",
+											"        const order = response.orders[0];",
+											"        pm.test(\"Order has required fields\", function () {",
+											"            pm.expect(order).to.have.property('order_id');",
+											"            pm.expect(order).to.have.property('client_order_id');",
+											"            pm.expect(order).to.have.property('symbol');",
+											"            pm.expect(order).to.have.property('order_type');",
+											"            pm.expect(order).to.have.property('side');",
+											"            pm.expect(order).to.have.property('status');",
+											"            pm.expect(order).to.have.property('original_quantity');",
+											"            pm.expect(order).to.have.property('remaining_quantity');",
+											"            pm.expect(order).to.have.property('executed_quantity');",
+											"        });",
+											"        ",
+											"        pm.test(\"Order uses modern field values\", function () {",
+											"            const validOrderTypes = ['market', 'limit', 'stop', 'stop_limit'];",
+											"            const validSides = ['buy', 'sell'];",
+											"            const validStatuses = ['pending', 'partial', 'filled', 'cancelled', 'rejected', 'expired', 'cancelling', 'modifying'];",
+											"            ",
+											"            pm.expect(validOrderTypes).to.include(order.order_type);",
+											"            pm.expect(validSides).to.include(order.side);",
+											"            pm.expect(validStatuses).to.include(order.status);",
+											"        });",
+											"        ",
+											"        console.log(\"📝 Sample Order:\", JSON.stringify(order, null, 2));",
+											"    } else {",
+											"        console.log(\"📝 No open orders found\");",
+											"    }",
+											"    ",
+											"    // Test summary statistics accuracy",
+											"    pm.test(\"Summary statistics are accurate\", function () {",
+											"        pm.expect(response.total_orders).to.eql(response.orders.length);",
+											"    });",
+											"} else {",
+											"    console.log(\"❌ Open Orders Request Failed:\", response.error || response.message);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/trading/orders/open",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"orders",
+										"open"
+									]
+								},
+								"description": "Retrieve all currently open/pending orders.\n\n**Modern API Features:**\n- Complete abstraction from FIX protocol\n- Human-readable field names and values\n- No FIX codes exposed in responses\n- Comprehensive summary statistics\n\n**Order Statuses (Modern):**\n- `pending`: Order accepted, waiting for execution\n- `partial`: Order partially executed\n- `filled`: Order completely executed\n- `cancelled`: Order cancelled by user or system\n- `rejected`: Order rejected by broker/market\n- `expired`: Order expired (GTD orders)\n- `cancelling`: Cancel request in progress\n- `modifying`: Modification request in progress\n\n**Order Types (Modern):**\n- `market`: Immediate execution at current market price\n- `limit`: Execute at specified price or better\n- `stop`: Trigger at stop price, then market order\n- `stop_limit`: Trigger at stop price, then limit order\n\n**Response Features:**\n- Complete order details with modern field names\n- Summary statistics (orders by status, by symbol)\n- Financial information (prices, quantities, P&L)\n- Request tracking and processing time\n- Human-readable status messages\n\n**FIX Protocol:** Uses Order Mass Status Request (AF) with complete translation to modern format."
+							},
+							"response": [
+								{
+									"name": "Open Orders Success",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Authorization",
+												"value": "Bearer {{auth_token}}",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{base_url}}/trading/orders/open",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"trading",
+												"orders",
+												"open"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "content-type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n    \"success\": true,\n    \"orders\": [\n        {\n            \"order_id\": \"12345678\",\n            \"client_order_id\": \"ORD_1757255704625008\",\n            \"symbol\": \"EUR/USD\",\n            \"order_type\": \"limit\",\n            \"side\": \"buy\",\n            \"status\": \"pending\",\n            \"original_quantity\": 0.01,\n            \"remaining_quantity\": 0.01,\n            \"executed_quantity\": 0.0,\n            \"price\": 1.0850,\n            \"stop_price\": null,\n            \"average_price\": null,\n            \"time_in_force\": \"gtc\",\n            \"expire_time\": null,\n            \"stop_loss\": 1.0800,\n            \"take_profit\": 1.0900,\n            \"comment\": \"Swing trade setup\",\n            \"tag\": \"STRATEGY_A\",\n            \"magic\": 12345,\n            \"created_at\": \"2023-12-01T10:30:00Z\",\n            \"updated_at\": null\n        }\n    ],\n    \"total_orders\": 1,\n    \"orders_by_status\": {\n        \"pending\": 1,\n        \"partial\": 0\n    },\n    \"orders_by_symbol\": {\n        \"EUR/USD\": 1\n    },\n    \"message\": \"Retrieved 1 open orders\",\n    \"request_id\": \"MSR_1640995200000000\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\",\n    \"processing_time_ms\": 150\n}"
+								},
+								{
+									"name": "No Open Orders",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Authorization",
+												"value": "Bearer {{auth_token}}",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{base_url}}/trading/orders/open",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"trading",
+												"orders",
+												"open"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "content-type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n    \"success\": true,\n    \"orders\": [],\n    \"total_orders\": 0,\n    \"orders_by_status\": {},\n    \"orders_by_symbol\": {},\n    \"message\": \"No open orders found\",\n    \"request_id\": \"MSR_1640995200000001\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\",\n    \"processing_time_ms\": 120\n}"
+								}
+							]
+						},
+						{
+							"name": "Get Open Positions",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Test response status",
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"// Parse response",
+											"const response = pm.response.json();",
+											"",
+											"// Test response structure",
+											"pm.test(\"Response has required fields\", function () {",
+											"    pm.expect(response).to.have.property('success');",
+											"    pm.expect(response).to.have.property('positions');",
+											"    pm.expect(response).to.have.property('total_positions');",
+											"    pm.expect(response).to.have.property('positions_by_type');",
+											"    pm.expect(response).to.have.property('positions_by_symbol');",
+											"    pm.expect(response).to.have.property('message');",
+											"    pm.expect(response).to.have.property('request_result');",
+											"    pm.expect(response).to.have.property('request_status');",
+											"    pm.expect(response).to.have.property('timestamp');",
+											"});",
+											"",
+											"// Test data types",
+											"pm.test(\"Response data types are correct\", function () {",
+											"    pm.expect(response.success).to.be.a('boolean');",
+											"    pm.expect(response.positions).to.be.an('array');",
+											"    pm.expect(response.total_positions).to.be.a('number');",
+											"    pm.expect(response.positions_by_type).to.be.an('object');",
+											"    pm.expect(response.positions_by_symbol).to.be.an('object');",
+											"    pm.expect(response.message).to.be.a('string');",
+											"    pm.expect(response.request_result).to.be.a('string');",
+											"    pm.expect(response.request_status).to.be.a('string');",
+											"});",
+											"",
+											"// Test modern request status values",
+											"pm.test(\"Request status uses modern values\", function () {",
+											"    const validResults = ['valid_request', 'no_positions', 'not_supported'];",
+											"    const validStatuses = ['completed', 'rejected'];",
+											"    pm.expect(validResults).to.include(response.request_result);",
+											"    pm.expect(validStatuses).to.include(response.request_status);",
+											"});",
+											"",
+											"// Test success response",
+											"if (response.success) {",
+											"    console.log(\"✅ Open Positions Retrieved Successfully!\");",
+											"    console.log(\"📊 Total Positions:\", response.total_positions);",
+											"    console.log(\"📋 Positions by Type:\", JSON.stringify(response.positions_by_type, null, 2));",
+											"    console.log(\"📈 Positions by Symbol:\", JSON.stringify(response.positions_by_symbol, null, 2));",
+											"    console.log(\"🎯 Request Result:\", response.request_result);",
+											"    console.log(\"✅ Request Status:\", response.request_status);",
+											"    console.log(\"💬 Message:\", response.message);",
+											"    console.log(\"🔧 Implementation: Uses Order Mass Status Request (filters OrdType='N')\");",
+											"    ",
+											"    // Test financial summary fields",
+											"    pm.test(\"Financial summary fields exist\", function () {",
+											"        pm.expect(response).to.have.property('total_unrealized_pnl');",
+											"        pm.expect(response).to.have.property('total_realized_pnl');",
+											"        pm.expect(response).to.have.property('total_commission');",
+											"        pm.expect(response).to.have.property('total_swap');",
+											"    });",
+											"    ",
+											"    if (response.total_unrealized_pnl !== null) {",
+											"        console.log(\"💰 Total Unrealized P&L:\", response.total_unrealized_pnl);",
+											"    }",
+											"    if (response.total_commission !== null) {",
+											"        console.log(\"💸 Total Commission:\", response.total_commission);",
+											"    }",
+											"    if (response.total_swap !== null) {",
+											"        console.log(\"🔄 Total Swap:\", response.total_swap);",
+											"    }",
+											"    ",
+											"    // Test position structure if positions exist",
+											"    if (response.positions.length > 0) {",
+											"        const position = response.positions[0];",
+											"        pm.test(\"Position has required fields\", function () {",
+											"            pm.expect(position).to.have.property('position_id');",
+											"            pm.expect(position).to.have.property('symbol');",
+											"            pm.expect(position).to.have.property('currency');",
+											"            pm.expect(position).to.have.property('position_type');",
+											"            pm.expect(position).to.have.property('status');",
+											"            pm.expect(position).to.have.property('net_quantity');",
+											"            pm.expect(position).to.have.property('long_quantity');",
+											"            pm.expect(position).to.have.property('short_quantity');",
+											"            pm.expect(position).to.have.property('average_price');",
+											"        });",
+											"        ",
+											"        pm.test(\"Position uses modern field values\", function () {",
+											"            const validTypes = ['long', 'short', 'net'];",
+											"            const validStatuses = ['open', 'closed', 'closing'];",
+											"            ",
+											"            pm.expect(validTypes).to.include(position.position_type);",
+											"            pm.expect(validStatuses).to.include(position.status);",
+											"        });",
+											"        ",
+											"        pm.test(\"Position quantities are consistent\", function () {",
+											"            const longQty = position.long_quantity || 0;",
+											"            const shortQty = position.short_quantity || 0;",
+											"            const netQty = Math.abs(position.net_quantity || 0);",
+											"            const expectedNet = Math.abs(longQty - shortQty);",
+											"            ",
+											"            pm.expect(Math.abs(netQty - expectedNet)).to.be.lessThan(0.001);",
+											"        });",
+											"        ",
+											"        console.log(\"📝 Sample Position:\", JSON.stringify(position, null, 2));",
+											"    } else {",
+											"        console.log(\"📝 No open positions found\");",
+											"    }",
+											"    ",
+											"    // Test summary statistics accuracy",
+											"    pm.test(\"Summary statistics are accurate\", function () {",
+											"        pm.expect(response.total_positions).to.eql(response.positions.length);",
+											"    });",
+											"} else {",
+											"    console.log(\"❌ Open Positions Request Failed:\", response.error || response.message);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/trading/positions/open",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"trading",
+										"positions",
+										"open"
+									]
+								},
+								"description": "Retrieve all currently open trading positions.\n\n**Modern API Features:**\n- Complete abstraction from FIX protocol\n- Human-readable field names and values\n- No FIX codes exposed in responses\n- Comprehensive financial summaries\n\n**Position Types (Modern):**\n- `long`: Long position (buy)\n- `short`: Short position (sell)\n- `net`: Net position (combined long/short)\n\n**Position Status (Modern):**\n- `open`: Position is currently open\n- `closed`: Position has been closed\n- `closing`: Position is being closed\n\n**Financial Information:**\n- **Net Position Calculation**: `net_quantity = |long_quantity - short_quantity|`\n- **Unrealized P&L**: Current profit/loss based on market price\n- **Commission & Swap**: Total fees and overnight charges\n- **Account Integration**: Current balance and transaction details\n\n**Response Features:**\n- Complete position details with modern field names\n- Summary statistics (positions by type, by symbol)\n- Financial aggregations (total P&L, commission, swap)\n- Position quantities and average prices\n- Request tracking and processing time\n- Human-readable status messages\n\n**Request Status Fields:**\n- `request_result`: `valid_request`, `no_positions`, `not_supported`\n- `request_status`: `completed`, `rejected`\n\n**FIX Protocol:** Uses Request for Positions (AN) with complete translation to modern format."
+							},
+							"response": [
+								{
+									"name": "Open Positions Success",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Authorization",
+												"value": "Bearer {{auth_token}}",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{base_url}}/trading/positions/open",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"trading",
+												"positions",
+												"open"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "content-type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n    \"success\": true,\n    \"positions\": [\n        {\n            \"position_id\": \"POS_12345\",\n            \"symbol\": \"EUR/USD\",\n            \"currency\": \"EUR\",\n            \"position_type\": \"long\",\n            \"status\": \"open\",\n            \"net_quantity\": 0.01,\n            \"long_quantity\": 0.01,\n            \"short_quantity\": 0.0,\n            \"average_price\": 1.08950,\n            \"long_average_price\": 1.08950,\n            \"short_average_price\": null,\n            \"current_price\": 1.09150,\n            \"unrealized_pnl\": 20.0,\n            \"realized_pnl\": 0.0,\n            \"commission\": 0.02,\n            \"commission_currency\": \"USD\",\n            \"swap\": -0.50,\n            \"account_balance\": 10000.50,\n            \"transaction_amount\": 1089.50,\n            \"transaction_currency\": \"USD\",\n            \"report_type\": \"response\",\n            \"created_at\": \"2023-12-01T10:30:00Z\",\n            \"updated_at\": null,\n            \"clearing_date\": \"2023-12-01T00:00:00Z\"\n        }\n    ],\n    \"total_positions\": 1,\n    \"positions_by_type\": {\n        \"long\": 1,\n        \"short\": 0,\n        \"net\": 0\n    },\n    \"positions_by_symbol\": {\n        \"EUR/USD\": 1\n    },\n    \"total_unrealized_pnl\": 20.0,\n    \"total_realized_pnl\": 0.0,\n    \"total_commission\": 0.02,\n    \"total_swap\": -0.50,\n    \"message\": \"Retrieved 1 open positions\",\n    \"request_id\": \"POS_1640995200000000\",\n    \"request_result\": \"valid_request\",\n    \"request_status\": \"completed\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\",\n    \"processing_time_ms\": 200\n}"
+								},
+								{
+									"name": "No Open Positions",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Authorization",
+												"value": "Bearer {{auth_token}}",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{base_url}}/trading/positions/open",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"trading",
+												"positions",
+												"open"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "content-type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n    \"success\": true,\n    \"positions\": [],\n    \"total_positions\": 0,\n    \"positions_by_type\": {},\n    \"positions_by_symbol\": {},\n    \"total_unrealized_pnl\": null,\n    \"total_realized_pnl\": null,\n    \"total_commission\": null,\n    \"total_swap\": null,\n    \"message\": \"No open positions found\",\n    \"request_id\": \"POS_1640995200000001\",\n    \"request_result\": \"no_positions\",\n    \"request_status\": \"completed\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\",\n    \"processing_time_ms\": 180\n}"
+								},
+								{
+									"name": "Positions Not Supported (Gross Account)",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Authorization",
+												"value": "Bearer {{auth_token}}",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{base_url}}/trading/positions/open",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"trading",
+												"positions",
+												"open"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "content-type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n    \"success\": false,\n    \"positions\": [],\n    \"total_positions\": 0,\n    \"positions_by_type\": {},\n    \"positions_by_symbol\": {},\n    \"total_unrealized_pnl\": null,\n    \"total_realized_pnl\": null,\n    \"total_commission\": null,\n    \"total_swap\": null,\n    \"message\": \"Position requests are not supported for your account type. This is a broker limitation for Gross account types. You may need to check positions through your trading platform or contact your broker for position information.\",\n    \"request_id\": \"POS_1640995200000002\",\n    \"request_result\": \"not_supported\",\n    \"request_status\": \"rejected\",\n    \"timestamp\": \"2023-12-01T15:30:00Z\",\n    \"processing_time_ms\": 134\n}"
+								}
+							]
+						}
+					],
+					"description": "Retrieve open orders and positions with complete modern API abstraction.\n\n## 📊 Open Orders Endpoint\n**GET /trading/orders/open** - Get all currently open/pending orders\n- Uses FIX Order Mass Status Request (AF) protocol\n- Filters for actual orders (excludes positions with OrdType='N')\n- Complete translation to modern field names\n- Smart status determination using execution context\n- Summary statistics by status and symbol\n- No FIX codes exposed in responses\n\n## 📈 Open Positions Endpoint  \n**GET /trading/positions/open** - Get all currently open trading positions\n- ✨ **NEW IMPLEMENTATION**: Uses FIX Order Mass Status Request (AF) protocol\n- Filters for positions (OrdType='N') from Execution Reports\n- **FIXED**: No longer fails with \"not supported for account type\" on Gross accounts\n- Complete financial summaries and P&L calculations\n- Position type classification (long/short/net) based on side\n- Comprehensive account integration\n\n## 🔄 Unified Data Source\n- **Both endpoints use the same FIX request**: Order Mass Status Request (AF)\n- **Smart filtering**: Orders vs Positions separated by OrdType field\n- **Consistent data**: Same underlying Execution Report parsing\n- **Improved reliability**: Single FIX protocol integration point\n\n## 🔄 Modern Translation Features\n- **Order Statuses**: `pending`, `partial`, `filled`, `cancelled`, `rejected`, `expired`, `cancelling`, `modifying`\n- **Position Types**: `long`, `short`, `net`\n- **Request Results**: `valid_request`, `no_positions`, `unknown`\n- **Smart Status Logic**: Considers quantities, prices, and order types\n- **Human-readable messages**: Complete abstraction from FIX protocol\n\n## 🧪 Testing Features\n- Comprehensive validation of response structure\n- Modern field value verification\n- Summary statistics accuracy checks\n- Financial calculation validation\n- Request tracking and performance monitoring\n- Cross-endpoint consistency validation\n\n## 💡 Usage Tips\n- Both endpoints require JWT authentication\n- Responses include processing time for performance monitoring\n- Request IDs are unique for debugging and tracking\n- Financial summaries aggregate across all positions\n- Empty results are handled gracefully with appropriate messages\n- Both endpoints now work reliably with all account types\n\n## ✅ Recent Improvements\n- **Fixed Gross Account Support**: Positions endpoint no longer fails on Gross accounts\n- **Accurate Status Detection**: Market orders with avg_price correctly show as 'filled'\n- **Unified Architecture**: Both endpoints use same FIX integration for consistency\n- **Enhanced Field Parsing**: Complete Execution Report field support\n- **Improved Filtering**: Proper separation of orders vs positions"
 				},
 				{
 					"name": "🏥 Trading Health Check",

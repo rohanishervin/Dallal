@@ -138,6 +138,10 @@ class FIXServiceProcess:
                     self._handle_order_cancel_request(request_id, request_data)
                 elif request_type == "order_modify":
                     self._handle_order_modify_request(request_id, request_data)
+                elif request_type == "order_mass_status_request":
+                    self._handle_order_mass_status_request(request_id, request_data)
+                elif request_type == "request_for_positions":
+                    self._handle_request_for_positions(request_id, request_data)
                 else:
                     self._send_error_response(request_id, f"Unknown request type: {request_type or action}")
 
@@ -532,6 +536,76 @@ class FIXServiceProcess:
         except Exception as e:
             logger.error(f"Error handling market data unsubscribe: {e}")
             self._send_error_response(request_id, f"Unsubscription error: {e}")
+
+    def _handle_order_mass_status_request(self, request_id: str, request_data: dict):
+        """Handle Order Mass Status Request"""
+        try:
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Order mass status request only available on trade sessions")
+                return
+
+            mass_request_id = request_data.get("request_id")
+            if not mass_request_id:
+                self._send_error_response(request_id, "Request ID is required for order mass status request")
+                return
+
+            success, data, error = self.adapter.send_order_mass_status_request(mass_request_id)
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling order mass status request: {e}")
+            self._send_error_response(request_id, f"Order mass status request failed: {e}")
+
+    def _handle_request_for_positions(self, request_id: str, request_data: dict):
+        """Handle Request for Positions"""
+        try:
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Request for positions only available on trade sessions")
+                return
+
+            pos_request_id = request_data.get("request_id")
+            account_id = request_data.get("account_id")
+
+            if not pos_request_id:
+                self._send_error_response(request_id, "Request ID is required for positions request")
+                return
+
+            if not account_id:
+                self._send_error_response(request_id, "Account ID is required for positions request")
+                return
+
+            success, data, error = self.adapter.send_request_for_positions(pos_request_id, account_id)
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling request for positions: {e}")
+            self._send_error_response(request_id, f"Request for positions failed: {e}")
 
     def _cleanup(self):
         """Cleanup resources"""

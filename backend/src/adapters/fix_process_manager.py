@@ -409,6 +409,22 @@ class FIXProcessManager:
         for process_id in list(self.processes.keys()):
             self.stop_fix_process(process_id)
 
+    async def send_order_mass_status_request_async(
+        self, process_id: str, user_id: str, request_id: str
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send Order Mass Status Request to FIX process (async version)"""
+        request_data = {"user_id": user_id, "request_id": request_id}
+
+        return await self.send_request(process_id, "order_mass_status_request", request_data, timeout=30)
+
+    async def send_request_for_positions_async(
+        self, process_id: str, user_id: str, request_id: str, account_id: str
+    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send Request for Positions to FIX process (async version)"""
+        request_data = {"user_id": user_id, "request_id": request_id, "account_id": account_id}
+
+        return await self.send_request(process_id, "request_for_positions", request_data, timeout=30)
+
 
 # Global instance
 fix_process_manager = FIXProcessManager()

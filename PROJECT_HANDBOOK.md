@@ -391,11 +391,21 @@ quickfix-ssl==1.15.1
   - [x] Complete test suite with 16 comprehensive test cases
   - [x] Data consistency validation across all endpoints
   - [x] Proper error handling and authentication
+- [x] **Open Orders and Positions Endpoints**
+  - [x] GET /trading/orders/open - Retrieve all currently open orders
+  - [x] GET /trading/positions/open - Retrieve all currently open positions
+  - [x] FIX Order Mass Status Request (AF) implementation
+  - [x] FIX Request for Positions (AN) implementation
+  - [x] Complete modern response translation using centralized system
+  - [x] Summary statistics and financial aggregations
+  - [x] Comprehensive test suite with real FIX integration
+  - [x] Process-isolated FIX communication for thread safety
+  - [x] Modern field names with no FIX code exposure
 
 ### 🚧 Current Work
 - [x] **Modern API Response System** - Complete abstraction from FIX protocol
 - [x] **Centralized FIX Translation System** - Single source of truth for all translations
-- [ ] Testing the new modern trading endpoints with real FIX credentials  
+- [x] **Open Orders and Positions Implementation** - Complete with testing
 - [ ] Implementing Market Data Request for real-time quotes
 - [ ] Order status tracking and real-time updates
 
@@ -1453,15 +1463,171 @@ Check if the trading service is operational.
 }
 ```
 
+#### Open Orders
+
+**GET /trading/orders/open** - Get All Open Orders
+Retrieve all currently open/pending orders using FIX Order Mass Status Request.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "orders": [
+    {
+      "order_id": "12345678",
+      "client_order_id": "ORD_1757255704625008",
+      "symbol": "EUR/USD",
+      "order_type": "limit",
+      "side": "buy",
+      "status": "pending",
+      "original_quantity": 0.01,
+      "remaining_quantity": 0.01,
+      "executed_quantity": 0.0,
+      "price": 1.0850,
+      "stop_price": null,
+      "average_price": null,
+      "time_in_force": "gtc",
+      "expire_time": null,
+      "stop_loss": 1.0800,
+      "take_profit": 1.0900,
+      "comment": "Swing trade setup",
+      "tag": "STRATEGY_A",
+      "magic": 12345,
+      "created_at": "2023-12-01T10:30:00Z",
+      "updated_at": null
+    }
+  ],
+  "total_orders": 1,
+  "orders_by_status": {
+    "pending": 1,
+    "partial": 0
+  },
+  "orders_by_symbol": {
+    "EUR/USD": 1
+  },
+  "message": "Retrieved 1 open orders",
+  "request_id": "MSR_1640995200000000",
+  "timestamp": "2023-12-01T15:30:00Z",
+  "processing_time_ms": 150
+}
+```
+
+**Modern Order Fields:**
+- **order_type**: `market`, `limit`, `stop`, `stop_limit`
+- **side**: `buy`, `sell`
+- **status**: `pending`, `partial`, `filled`, `cancelled`, `rejected`, `expired`, `cancelling`, `modifying`
+- **time_in_force**: `gtc`, `ioc`, `gtd`
+
+**Summary Statistics:**
+- `orders_by_status`: Breakdown of orders by current status
+- `orders_by_symbol`: Breakdown of orders by trading symbol
+- `total_orders`: Total count of open orders
+
+#### Open Positions
+
+**GET /trading/positions/open** - Get All Open Positions
+Retrieve all currently open trading positions using FIX Request for Positions.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "positions": [
+    {
+      "position_id": "POS_12345",
+      "symbol": "EUR/USD",
+      "currency": "EUR",
+      "position_type": "long",
+      "status": "open",
+      "net_quantity": 0.01,
+      "long_quantity": 0.01,
+      "short_quantity": 0.0,
+      "average_price": 1.08950,
+      "long_average_price": 1.08950,
+      "short_average_price": null,
+      "current_price": 1.09150,
+      "unrealized_pnl": 20.0,
+      "realized_pnl": 0.0,
+      "commission": 0.02,
+      "commission_currency": "USD",
+      "swap": -0.50,
+      "account_balance": 10000.50,
+      "transaction_amount": 1089.50,
+      "transaction_currency": "USD",
+      "report_type": "response",
+      "created_at": "2023-12-01T10:30:00Z",
+      "updated_at": null,
+      "clearing_date": "2023-12-01T00:00:00Z"
+    }
+  ],
+  "total_positions": 1,
+  "positions_by_type": {
+    "long": 1,
+    "short": 0,
+    "net": 0
+  },
+  "positions_by_symbol": {
+    "EUR/USD": 1
+  },
+  "total_unrealized_pnl": 20.0,
+  "total_realized_pnl": 0.0,
+  "total_commission": 0.02,
+  "total_swap": -0.50,
+  "message": "Retrieved 1 open positions",
+  "request_id": "POS_1640995200000000",
+  "request_result": "valid_request",
+  "request_status": "completed",
+  "timestamp": "2023-12-01T15:30:00Z",
+  "processing_time_ms": 200
+}
+```
+
+**Modern Position Fields:**
+- **position_type**: `long`, `short`, `net`
+- **status**: `open`, `closed`, `closing`
+- **report_type**: `login`, `response`, `rollover`, `create`, `modify`, `cancel`, `close`
+
+**Financial Information:**
+- **Net Position Calculation**: `net_quantity = |long_quantity - short_quantity|`
+- **Unrealized P&L**: Current profit/loss based on market price
+- **Commission & Swap**: Total fees and overnight charges
+- **Account Integration**: Current balance and transaction details
+
+**Summary Statistics:**
+- `positions_by_type`: Breakdown by position type (long/short/net)
+- `positions_by_symbol`: Breakdown by trading symbol
+- `total_*`: Aggregated financial summaries across all positions
+
+**Request Status Fields:**
+- `request_result`: `valid_request`, `no_positions`, `not_supported`, `not_authorized`, `unknown`
+- `request_status`: `completed`, `rejected`
+
+**Important Notes:**
+- Some brokers don't support position requests for certain account types (e.g., Gross accounts)
+- If positions are not supported, the API will return a clear error message with `request_result: "not_supported"`
+- Alternative: Check positions through your trading platform or use order history to infer positions
+
 ### Planned Endpoints
 
 #### Market Data (Future)
 - `GET /market/quotes/{symbol}` - Get current quote
 - `WebSocket /ws/market` - Real-time market data
 
-#### Positions
-- `GET /positions` - Get current positions
-- `GET /positions/summary` - Position summary
+#### Real-time Updates (Future)
+- `WebSocket /ws/orders` - Real-time order updates
+- `WebSocket /ws/positions` - Real-time position updates
+- `GET /trading/orders/history` - Order history
+- `GET /trading/positions/history` - Position history
 
 ---
 
@@ -1936,6 +2102,223 @@ The application logs FIX protocol communication details. Check console output fo
 
 ---
 
+## 📊 Open Orders & Positions Endpoints
+
+### Overview
+The `/trading/orders/open` and `/trading/positions/open` endpoints provide comprehensive access to active trading data with complete FIX protocol abstraction. Both endpoints use a unified data source approach for consistency and reliability.
+
+### 🔄 Unified Architecture
+
+#### **Single Data Source Implementation**
+Both endpoints use the **same FIX request** (`Order Mass Status Request AF`) and intelligently separate orders from positions:
+
+```python
+# Unified data retrieval
+fix_orders = await fix_adapter.send_order_mass_status_request(user_id, request_id)
+
+# Smart filtering
+orders = [order for order in fix_orders if order.get('order_type') != 'N']      # Regular orders
+positions = [order for order in fix_orders if order.get('order_type') == 'N']  # Position type
+```
+
+#### **Why This Approach?**
+1. **Gross Account Compatibility**: Eliminates "not supported for account type" errors
+2. **Data Consistency**: Same underlying data source prevents discrepancies
+3. **Reduced FIX Complexity**: Single integration point instead of multiple protocols
+4. **Better Reliability**: Unified error handling and status management
+
+### 📊 GET /trading/orders/open
+
+#### **Purpose**
+Retrieve all currently open/pending orders with modern field translation.
+
+#### **FIX Protocol Integration**
+- **Request**: Order Mass Status Request (AF)
+- **Response**: Multiple Execution Reports (8)
+- **Filtering**: Excludes positions (`OrdType != 'N'`)
+
+#### **Smart Status Determination**
+The endpoint uses intelligent logic to determine actual order status:
+
+```python
+def _determine_actual_order_status(fix_status, remaining_qty, executed_qty, original_qty, fix_order):
+    # Completely filled orders
+    if executed_qty >= original_qty and remaining_qty <= 0:
+        return 'filled'
+    
+    # Partially filled orders  
+    if executed_qty > 0 and remaining_qty > 0:
+        return 'partial'
+        
+    # Market orders with average price (FIX quirk handling)
+    if order_type == '1' and avg_price > 0:
+        return 'filled'
+        
+    # Use FIX status translation
+    return translate_order_status(fix_status)
+```
+
+#### **Response Features**
+- **Modern Field Names**: No FIX codes exposed
+- **Complete Order Details**: All available fields from Execution Reports
+- **Summary Statistics**: Orders by status and symbol
+- **Financial Information**: Commission, swap, slippage details
+- **Enhanced Fields**: Parent order ID, rejection reasons, order flags
+
+### 📈 GET /trading/positions/open
+
+#### **Purpose**
+Retrieve all currently open trading positions with financial summaries.
+
+#### **New Implementation (Fixed)**
+- **Previous**: Used Request for Positions (AN) - failed on Gross accounts
+- **Current**: Uses Order Mass Status Request (AF) - works with all account types
+- **Filtering**: Includes only positions (`OrdType == 'N'`)
+
+#### **Position Data Mapping**
+Converts order fields to position fields:
+
+```python
+# Position quantity interpretation
+net_quantity = fix_order.get('leaves_qty')  # Remaining quantity = open position
+side = fix_order.get('side')                # '1' = Long, '2' = Short
+
+# Position type determination
+if side == '1':  # Buy side
+    long_quantity = abs(net_quantity)
+    short_quantity = 0.0
+    position_type = "long"
+else:  # Sell side  
+    long_quantity = 0.0
+    short_quantity = abs(net_quantity)
+    position_type = "short"
+```
+
+#### **Response Features**
+- **Financial Summaries**: Total P&L, commission, swap across all positions
+- **Position Classification**: Long/short/net position types
+- **Account Integration**: Balance and transaction details
+- **No Account Type Restrictions**: Works with Gross and Net accounts
+
+### 🧪 Testing Framework
+
+#### **Comprehensive Test Coverage**
+Both endpoints include extensive test suites following the TDD framework:
+
+**Test Categories:**
+1. **Success Scenarios**: Valid data retrieval and parsing
+2. **Authentication**: JWT token validation
+3. **Data Integrity**: Field validation and type checking
+4. **Status Logic**: Order status determination accuracy
+5. **Filtering Logic**: Proper separation of orders vs positions
+6. **Summary Statistics**: Calculation accuracy
+7. **Performance**: Response time validation
+8. **Error Handling**: Graceful failure management
+
+#### **Test Files**
+- `tests/test_open_orders.py`: Orders endpoint comprehensive testing
+- `tests/test_open_positions.py`: Positions endpoint comprehensive testing
+
+#### **Running Tests**
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run specific endpoint tests
+PYTHONPATH=. pytest tests/test_open_orders.py -v
+PYTHONPATH=. pytest tests/test_open_positions.py -v
+
+# Run all trading tests
+PYTHONPATH=. pytest tests/test_open*.py -v
+```
+
+### 📋 API Documentation
+
+#### **Postman Collection**
+Complete test cases and examples in `FIX_API_Adapter.postman_collection.json`:
+- **Request Examples**: Proper authentication headers
+- **Response Validation**: Comprehensive field checking
+- **Status Verification**: Modern field value validation
+- **Error Scenarios**: Handling of various failure modes
+
+#### **Swagger Documentation**
+Complete API documentation available at `/docs` with:
+- **Field Descriptions**: All order and position fields explained
+- **Enum Values**: Complete lists of statuses, types, and reasons
+- **Example Responses**: Real-world data examples
+- **Error Codes**: Comprehensive error handling documentation
+
+### 🔧 Implementation Details
+
+#### **Key Classes**
+- `OrdersService`: Business logic for open orders
+- `PositionsService`: Business logic for open positions  
+- `FIXTranslationSystem`: Centralized FIX code translation
+- `OpenOrder`: Pydantic model for order data
+- `OpenPosition`: Pydantic model for position data
+
+#### **Modern Translation Features**
+- **Status Translation**: All FIX order statuses to modern equivalents
+- **Type Translation**: Order types, sides, time-in-force options
+- **Rejection Reasons**: Human-readable rejection explanations
+- **Financial Data**: Commission types, currencies, calculation methods
+
+#### **Error Handling**
+- **Graceful Degradation**: Continues processing when individual records fail
+- **Detailed Logging**: Comprehensive error tracking for debugging
+- **User-Friendly Messages**: Clear error descriptions without FIX complexity
+- **Request Tracking**: Unique request IDs for debugging and monitoring
+
+### 💡 Usage Examples
+
+#### **Get Open Orders**
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     http://localhost:8000/trading/orders/open
+```
+
+#### **Get Open Positions**  
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     http://localhost:8000/trading/positions/open
+```
+
+#### **Response Processing**
+```javascript
+// Example response handling
+const ordersResponse = await fetch('/trading/orders/open');
+const ordersData = await ordersResponse.json();
+
+if (ordersData.success) {
+    console.log(`Found ${ordersData.total_orders} open orders`);
+    console.log('Orders by status:', ordersData.orders_by_status);
+    
+    // Process individual orders
+    ordersData.orders.forEach(order => {
+        console.log(`${order.order_type} ${order.side} order: ${order.status}`);
+    });
+}
+```
+
+### ⚠️ Important Notes
+
+#### **Account Type Compatibility**
+- **Previous Limitation**: Positions endpoint failed on Gross accounts
+- **Current Solution**: Unified approach works with all account types
+- **Broker Support**: No longer dependent on broker-specific position request support
+
+#### **Data Consistency**
+- **Same Source**: Both endpoints use identical FIX data source
+- **Consistent Timing**: Processing times should be similar
+- **Unified Status**: Same status translation logic applied consistently
+
+#### **Performance Considerations**
+- **Single Request**: Both endpoints benefit from shared FIX request
+- **Efficient Filtering**: Client-side separation minimizes FIX protocol overhead
+- **Caching Potential**: Future caching can benefit both endpoints simultaneously
+
+---
+
 ## Future Roadmap
 
 ### Phase 1: Core Trading Features
@@ -1983,9 +2366,13 @@ The application logs FIX protocol communication details. Check console output fo
 | `src/schemas/auth_schemas.py` | Pydantic models for login request/response |
 | `src/schemas/session_schemas.py` | Pydantic models for session status and logout |
 | `src/schemas/market_schemas.py` | Pydantic models for market data and instruments |
+| `src/schemas/orders_schemas.py` | Pydantic models for open orders endpoint |
+| `src/schemas/positions_schemas.py` | Pydantic models for open positions endpoint |
 | `src/services/auth_service.py` | Authentication business logic and JWT generation |
 | `src/services/session_manager.py` | FIX session lifecycle management and heartbeat monitoring |
 | `src/services/market_service.py` | Market data business logic and instrument parsing |
+| `src/services/orders_service.py` | Open orders business logic with modern translation |
+| `src/services/positions_service.py` | Open positions business logic with financial summaries |
 | `src/routers/auth_router.py` | REST API endpoints for authentication |
 | `src/routers/session_router.py` | REST API endpoints for session management |
 | `src/routers/market_router.py` | REST API endpoints for market data |
@@ -1994,6 +2381,8 @@ The application logs FIX protocol communication details. Check console output fo
 | `tests/test_market.py` | Market data endpoint tests with field validation |
 | `tests/test_history.py` | Historical bars endpoint tests with comprehensive coverage |
 | `tests/test_login.py` | Basic smoke test for login functionality |
+| `tests/test_open_orders.py` | Open orders endpoint tests with modern translation validation |
+| `tests/test_open_positions.py` | Open positions endpoint tests with financial summary validation |
 | `pytest.ini` | Pytest configuration for async testing |
 | `pyproject.toml` | Black and isort configuration |
 | `.pre-commit-config.yaml` | Pre-commit hooks configuration |
