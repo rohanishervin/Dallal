@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b8c4d7e1-4a89-4c2b-9f14-8d7e6f3a2b5c",
 		"name": "FIX API Adapter - Complete Collection",
-		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **NEW: Complete Trading System** 🎯\n  - Market orders (immediate execution)\n  - Limit orders (execute at specified price)\n  - Stop orders (trigger at stop price)\n  - Stop-limit orders (trigger + limit protection)\n  - Order cancellation and modification\n- WebSocket orderbook streaming\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **🚀 COMPLETE TRADING SYSTEM**: All 4 order types with full FIX protocol integration\n- **📊 Order Management**: Cancel and modify pending orders\n- **🛡️ Advanced Features**: Stop loss, take profit, time-in-force options\n- **💼 Order Metadata**: Comments, tags, magic numbers for order tracking\n- **⚡ Process Isolation**: Thread-safe QuickFIX integration\n- **🔒 Security**: JWT authentication with comprehensive validation\n- **WebSocket Orderbook**: Real-time orderbook streaming\n- **Historical Bars**: OHLCV data with multiple timeframes\n\n## Trading Order Types\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
+		"description": "Complete Postman collection for testing FIX API Adapter endpoints.\n\n## Authentication Flow\n1. First run **Login** to get JWT token\n2. Token is automatically saved to environment variable `auth_token`\n3. All protected endpoints use this token automatically\n\n## Available Endpoints\n- Authentication (login)\n- **Account Information** 💼\n  - Complete account info (all data)\n  - Essential balance (balance, equity, margin, leverage)\n- Session management (status, logout)\n- Market data (instruments, historical bars)\n- **Complete Trading System** 🎯\n  - Market orders (immediate execution)\n  - Limit orders (execute at specified price)\n  - Stop orders (trigger at stop price)\n  - Stop-limit orders (trigger + limit protection)\n  - Order cancellation and modification\n- WebSocket orderbook streaming\n- Health checks\n\n## Environment Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `ws_base_url`: WebSocket base URL (default: ws://localhost:8000)\n- `auth_token`: JWT token (auto-set after login)\n- `username`: Your FIX username\n- `password`: Your FIX password\n- `device_id`: Optional device identifier\n\n## New in this version\n- **🚀 COMPLETE TRADING SYSTEM**: All 4 order types with full FIX protocol integration\n- **📊 Order Management**: Cancel and modify pending orders\n- **🛡️ Advanced Features**: Stop loss, take profit, time-in-force options\n- **💼 Order Metadata**: Comments, tags, magic numbers for order tracking\n- **⚡ Process Isolation**: Thread-safe QuickFIX integration\n- **🔒 Security**: JWT authentication with comprehensive validation\n- **WebSocket Orderbook**: Real-time orderbook streaming\n- **Historical Bars**: OHLCV data with multiple timeframes\n\n## Trading Order Types\n1. **Market Orders**: Immediate execution at current market price\n2. **Limit Orders**: Execute at specified price or better\n3. **Stop Orders**: Trigger at stop price, then become market order\n4. **Stop-Limit Orders**: Trigger at stop price, then become limit order\n\n## WebSocket Usage\nUse external WebSocket clients (e.g., WebSocket King, wscat) to connect:\n```\nws://localhost:8000/ws/orderbook?token=YOUR_JWT_TOKEN\n```\nSend JSON messages:\n```json\n{\"type\": \"subscribe\", \"symbol\": \"EUR/USD\", \"levels\": 5}\n{\"type\": \"unsubscribe\", \"symbol\": \"EUR/USD\"}\n```",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "12345678"
 	},
@@ -391,6 +391,242 @@
 				}
 			],
 			"description": "Session management endpoints for monitoring and controlling FIX sessions."
+		},
+		{
+			"name": "💼 Account Information",
+			"item": [
+				{
+					"name": "Get Complete Account Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('account');",
+									"    pm.expect(response).to.have.property('message');",
+									"});",
+									"",
+									"// Test if request was successful",
+									"if (response.success) {",
+									"    pm.test(\"Account info retrieved successfully\", function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.account).to.be.an('object');",
+									"    });",
+									"    ",
+									"    console.log(\"✅ Complete Account Info Retrieved\");",
+									"    console.log(\"🆔 Account ID:\", response.account.account_id);",
+									"    console.log(\"👤 Account Name:\", response.account.account_name);",
+									"    console.log(\"💰 Balance:\", response.account.balance);",
+									"    console.log(\"📊 Equity:\", response.account.equity);",
+									"    console.log(\"🔒 Margin:\", response.account.margin);",
+									"    console.log(\"⚖️ Leverage:\", response.account.leverage);",
+									"    console.log(\"💱 Currency:\", response.account.currency);",
+									"    console.log(\"📈 Valid:\", response.account.is_valid);",
+									"    console.log(\"🚫 Blocked:\", response.account.is_blocked);",
+									"    console.log(\"📖 Read Only:\", response.account.is_readonly);",
+									"} else {",
+									"    pm.test(\"Request failed as expected\", function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error).to.be.a('string');",
+									"    });",
+									"    console.log(\"❌ Request failed:\", response.error);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/account/info",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"account",
+								"info"
+							]
+						},
+						"description": "Get complete account information including all available data.\n\n**Authentication Required**: JWT token in Authorization header\n\n**FIX Message**: Account Info Request (U1005) → Account Info (U1006)\n**Connection Used**: Trade session (port 5004)\n\n**Returns comprehensive account data**:\n- Account ID, name, and type information\n- Financial data: balance, equity, margin, leverage\n- Account status flags: valid, blocked, readonly\n- Risk management: margin call level, stop out level\n- Contact information and timestamps\n- Trading settings and commission info\n- Asset breakdown by currency\n- Throttling method information"
+					},
+					"response": [
+						{
+							"name": "Complete Account Info",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/account/info",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"account",
+										"info"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"account\": {\n        \"account_id\": \"224480013\",\n        \"account_name\": \"Demo Account\",\n        \"currency\": \"USD\",\n        \"balance\": 10000.00,\n        \"equity\": 10000.00,\n        \"margin\": 0.00,\n        \"leverage\": 100.0,\n        \"free_margin\": 10000.00,\n        \"margin_level\": null,\n        \"is_valid\": true,\n        \"is_blocked\": false,\n        \"is_readonly\": false,\n        \"accounting_type\": \"Gross\",\n        \"margin_call_level\": 50.0,\n        \"stop_out_level\": 20.0,\n        \"created_time\": \"2023-01-01T00:00:00Z\",\n        \"last_update_time\": \"2023-12-01T10:30:00Z\",\n        \"assets\": [\n            {\n                \"currency\": \"USD\",\n                \"balance\": 10000.00,\n                \"locked_amount\": 0.00\n            }\n        ],\n        \"throttling_methods\": [\n            {\n                \"method\": \"PlaceOrder\",\n                \"requests_per_second\": 10.0,\n                \"requests_per_minute\": 100.0\n            }\n        ]\n    },\n    \"message\": \"Account information retrieved successfully\",\n    \"timestamp\": \"2023-12-01T10:30:00Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Account Balance (Essential)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Test response status",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Parse response",
+									"const response = pm.response.json();",
+									"",
+									"// Test response structure",
+									"pm.test(\"Response has required fields\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response).to.have.property('account_id');",
+									"    pm.expect(response).to.have.property('balance');",
+									"    pm.expect(response).to.have.property('equity');",
+									"    pm.expect(response).to.have.property('margin');",
+									"    pm.expect(response).to.have.property('leverage');",
+									"});",
+									"",
+									"// Test if request was successful",
+									"if (response.success) {",
+									"    pm.test(\"Account balance retrieved successfully\", function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.balance).to.be.a('number');",
+									"        pm.expect(response.equity).to.be.a('number');",
+									"        pm.expect(response.margin).to.be.a('number');",
+									"        pm.expect(response.leverage).to.be.a('number');",
+									"    });",
+									"    ",
+									"    console.log(\"✅ Essential Account Balance Retrieved\");",
+									"    console.log(\"🆔 Account ID:\", response.account_id);",
+									"    console.log(\"💰 Balance:\", response.balance);",
+									"    console.log(\"📊 Equity:\", response.equity);",
+									"    console.log(\"🔒 Margin:\", response.margin);",
+									"    console.log(\"⚖️ Leverage:\", response.leverage);",
+									"    console.log(\"💵 Free Margin:\", response.free_margin);",
+									"    console.log(\"📈 Margin Level:\", response.margin_level ? response.margin_level.toFixed(2) + '%' : 'N/A');",
+									"    console.log(\"💱 Currency:\", response.currency);",
+									"} else {",
+									"    pm.test(\"Request failed as expected\", function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error).to.be.a('string');",
+									"    });",
+									"    console.log(\"❌ Request failed:\", response.error);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/account/balance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"account",
+								"balance"
+							]
+						},
+						"description": "Get essential account balance information (balance, equity, margin, leverage only).\n\n**Authentication Required**: JWT token in Authorization header\n\n**FIX Message**: Account Info Request (U1005) → Account Info (U1006)\n**Connection Used**: Trade session (port 5004)\n\n**Returns essential financial data**:\n- **Balance**: Current account balance\n- **Equity**: Current account equity (balance + floating P&L)\n- **Margin**: Used margin for open positions\n- **Leverage**: Account leverage setting\n- **Free Margin**: Available margin (equity - margin)\n- **Margin Level**: Margin level percentage (equity/margin * 100)\n- **Currency**: Account base currency\n\n**Use Case**: Perfect for trading dashboards and quick balance checks"
+					},
+					"response": [
+						{
+							"name": "Account Balance - Essential Data",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/account/balance",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"account",
+										"balance"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"account_id\": \"224480013\",\n    \"balance\": 10000.00,\n    \"equity\": 10000.00,\n    \"margin\": 0.00,\n    \"leverage\": 100.0,\n    \"free_margin\": 10000.00,\n    \"margin_level\": null,\n    \"currency\": \"USD\",\n    \"message\": \"Account balance retrieved successfully\",\n    \"timestamp\": \"2023-12-01T10:30:00Z\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Account information endpoints for retrieving account details, balance, and financial data.\n\n## 💼 Available Endpoints\n\n### 1. Complete Account Info (`/account/info`)\n- **Purpose**: Get comprehensive account information\n- **Data**: All available account fields from FIX U1006 message\n- **Use Case**: Account setup, detailed reporting, compliance\n\n### 2. Essential Balance (`/account/balance`)\n- **Purpose**: Get core financial metrics only\n- **Data**: Balance, equity, margin, leverage\n- **Use Case**: Trading dashboards, quick balance checks\n\n## 🔒 Authentication\n- All endpoints require JWT token in Authorization header\n- Token obtained from `/auth/login` endpoint\n\n## 📊 FIX Protocol Integration\n- **FIX Message**: Account Info Request (U1005) → Account Info (U1006)\n- **Connection**: Uses Trade session (port 5004)\n- **Real-time**: Data fetched directly from FIX server\n\n## 💡 Usage Tips\n- Use `/account/balance` for frequent updates (lighter payload)\n- Use `/account/info` for complete account analysis\n- Both endpoints cache results for performance\n- Data is refreshed on each request from FIX server"
 		},
 		{
 			"name": "📈 Market Data",
@@ -1903,7 +2139,7 @@
 					"",
 					"// Check if auth token exists for protected endpoints",
 					"const authToken = pm.environment.get(\"auth_token\");",
-					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\") || pm.request.url.toString().includes(\"/ws\") || pm.request.url.toString().includes(\"/trading\");",
+					"const isProtectedEndpoint = pm.request.url.toString().includes(\"/session\") || pm.request.url.toString().includes(\"/market\") || pm.request.url.toString().includes(\"/ws\") || pm.request.url.toString().includes(\"/trading\") || pm.request.url.toString().includes(\"/account\");",
 					"",
 					"if (isProtectedEndpoint && !authToken) {",
 					"    console.warn(\"⚠️  This endpoint requires authentication. Run the Login request first.\");",

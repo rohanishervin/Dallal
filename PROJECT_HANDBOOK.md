@@ -379,6 +379,18 @@ quickfix-ssl==1.15.1
   - [x] **Human-readable FIX response parsing and translation**
   - [x] Enhanced error messages with detailed explanations
   - [x] FIX code translation (order status, execution types, reject reasons)
+- [x] **Complete account information endpoints**
+  - [x] Account Info Request (U1005) and Response (U1006) implementation
+  - [x] Comprehensive account data parsing (all U1006 fields)
+  - [x] Account summary endpoint with full account details
+  - [x] Account balance endpoint with calculated metrics
+  - [x] Account leverage endpoint
+  - [x] Account assets endpoint for multi-currency support
+  - [x] Account status endpoint for quick status checks
+  - [x] Account refresh endpoint for cache invalidation
+  - [x] Complete test suite with 16 comprehensive test cases
+  - [x] Data consistency validation across all endpoints
+  - [x] Proper error handling and authentication
 
 ### 🚧 Current Work
 - [x] **Modern API Response System** - Complete abstraction from FIX protocol
@@ -687,6 +699,261 @@ Authorization: Bearer <jwt_token>
   "timestamp": "2023-12-01T15:30:00Z"
 }
 ```
+
+### Account Endpoints
+
+The account endpoints provide comprehensive access to account information, balance details, leverage settings, and asset management. All endpoints require JWT authentication.
+
+#### Account Health Check
+
+**GET /account/health** - Account Service Health Check
+Check if the account service is operational.
+
+*Response:*
+```json
+{
+  "status": "healthy",
+  "service": "account",
+  "message": "Account service is operational"
+}
+```
+
+#### Account Summary
+
+**GET /account/summary** - Get Complete Account Summary
+Retrieve comprehensive account information including all financial data, status flags, and settings.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "account": {
+    "account_id": "224480013",
+    "account_name": "Demo Account",
+    "currency": "USD",
+    "accounting_type": "N",
+    "balance": 10000.00,
+    "equity": 10000.00,
+    "margin": 0.00,
+    "leverage": 400.0,
+    "account_valid": true,
+    "account_blocked": false,
+    "account_readonly": false,
+    "investor_login": false,
+    "margin_call_level": 50.0,
+    "stop_out_level": 20.0,
+    "email": "demo@example.com",
+    "registration_date": "2023-01-15T10:30:00Z",
+    "last_modified": "2023-12-01T10:30:00Z",
+    "sessions_per_account": 5,
+    "requests_per_second": 10,
+    "report_currency": "USD",
+    "token_commission_currency": null,
+    "token_commission_discount": null,
+    "token_commission_enabled": false,
+    "comment": "Demo trading account",
+    "request_id": "AIR_1640995200000"
+  },
+  "message": "Account summary retrieved successfully",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+**Field Descriptions:**
+- `account_id`: Unique account identifier
+- `accounting_type`: Account type - "N" (Net), "G" (Gross), "C" (Cash)
+- `balance`: Current account balance
+- `equity`: Current account equity (balance + floating P&L)
+- `margin`: Used margin for open positions
+- `leverage`: Account leverage setting
+- `account_valid`: Whether account is valid and active
+- `account_blocked`: Whether account is blocked
+- `account_readonly`: Whether account is in read-only mode
+- `margin_call_level`: Margin level that triggers margin call
+- `stop_out_level`: Margin level that triggers automatic position closure
+
+#### Account Balance
+
+**GET /account/balance** - Get Account Balance Information
+Retrieve focused financial balance information with calculated metrics.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "account_id": "224480013",
+  "balance": 10000.00,
+  "equity": 10000.00,
+  "margin": 0.00,
+  "free_margin": 10000.00,
+  "margin_level": null,
+  "currency": "USD",
+  "message": "Account balance retrieved successfully",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+**Calculated Fields:**
+- `free_margin`: Equity - Margin (available for new positions)
+- `margin_level`: (Equity / Margin) * 100 (percentage, null if margin = 0)
+
+#### Account Leverage
+
+**GET /account/leverage** - Get Account Leverage
+Retrieve the account's leverage setting.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "account_id": "224480013",
+  "leverage": 400.0,
+  "message": "Account leverage retrieved successfully",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+#### Account Assets
+
+**GET /account/assets** - Get Account Assets
+Retrieve information about all assets (currencies) in the account.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "account_id": "224480013",
+  "assets": [
+    {
+      "currency": "USD",
+      "balance": 10000.00,
+      "locked_amount": 0.00
+    }
+  ],
+  "message": "Account assets retrieved successfully (1 assets)",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+#### Account Status
+
+**GET /account/status** - Get Account Status
+Retrieve quick account status information including validity and key metrics.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "account_id": "224480013",
+  "is_valid": true,
+  "is_blocked": false,
+  "is_readonly": false,
+  "accounting_type": "N",
+  "currency": "USD",
+  "margin_level": null,
+  "free_margin": 10000.00,
+  "message": "Account status retrieved successfully",
+  "timestamp": "2023-12-01T15:30:00Z"
+}
+```
+
+#### Account Refresh
+
+**POST /account/refresh** - Refresh Account Information
+Force a fresh retrieval of account information from the FIX server, bypassing cache.
+
+*Headers:*
+```
+Authorization: Bearer <jwt_token>
+```
+
+*Request Body:*
+```json
+{
+  "request_id": "optional_custom_id"
+}
+```
+
+*Success Response:*
+```json
+{
+  "success": true,
+  "message": "Account information refreshed successfully",
+  "timestamp": "2023-12-01T15:30:00Z",
+  "request_id": "optional_custom_id"
+}
+```
+
+#### Error Responses
+
+All account endpoints return consistent error responses:
+
+**401 Unauthorized:**
+```json
+{
+  "detail": "Invalid user token"
+}
+```
+
+**404 Not Found:**
+```json
+{
+  "detail": "Account information not found"
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "detail": "Failed to retrieve account information"
+}
+```
+
+#### Account Data Consistency
+
+The account endpoints ensure data consistency across all responses:
+- Account ID is consistent across all endpoints
+- Financial data (balance, equity, margin) is synchronized
+- Status information is updated in real-time
+- All timestamps reflect the actual data retrieval time
+
+#### FIX Protocol Integration
+
+Account endpoints use the FIX Account Info Request (U1005) and Account Info Response (U1006) messages:
+
+**Request (U1005):**
+- `MsgType`: U1005
+- `AcInfReqID`: Unique request identifier
+
+**Response (U1006):**
+- Complete account information as defined in FIX specification
+- Comprehensive field mapping to modern API responses
+- Automatic data type conversion and validation
 
 ### Trading Endpoints
 

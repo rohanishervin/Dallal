@@ -9,6 +9,7 @@ from slowapi.util import get_remote_address
 
 from src.config.settings import config
 from src.core.fix_translation_system import FIXTranslationSystem
+from src.routers.account_router import router as account_router
 from src.routers.auth_router import router as auth_router
 from src.routers.market_router import router as market_router
 from src.routers.session_router import router as session_router
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(account_router)
 app.include_router(session_router)
 app.include_router(market_router)
 app.include_router(trading_router)
