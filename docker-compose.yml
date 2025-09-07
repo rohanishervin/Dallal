@@ -43,6 +43,22 @@ services:
       - backend
     command: pnpm dev
 
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - backend_cache:/app/.venv
+    environment:
+      - NATS_URL=nats://nats:4222
+      - DEBUG=True
+    depends_on:
+      - nats
+    command: bash -c "PYTHONPATH=. pytest tests/ -v --tb=short"
+    profiles:
+      - test
+
 volumes:
   nats_data:
   nats_logs:

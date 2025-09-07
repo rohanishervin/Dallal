@@ -8,7 +8,12 @@ The project uses pre-commit hooks to ensure code quality and consistency. The ho
 
 1. **Format code** with Black (120-character line length)
 2. **Sort imports** with isort 
-3. **Run tests** to ensure functionality
+3. **Run tests** using Docker Compose to ensure functionality
+
+## Prerequisites
+
+- Docker and Docker Compose installed
+- Backend virtual environment set up (`cd backend && uv venv && source .venv/bin/activate && uv pip install -r requirements.txt`)
 
 ## Quick Setup
 
@@ -23,10 +28,13 @@ That's it! The pre-commit hooks are now active and will run automatically on eve
 
 ```bash
 # Run hooks on all files manually
-cd backend && source .venv/bin/activate && pre-commit run --all-files
+pre-commit run --all-files
 
 # Run hooks on staged files only
-cd backend && source .venv/bin/activate && pre-commit run
+pre-commit run
+
+# Run tests manually using Docker Compose
+docker compose --profile test run --rm backend-test
 
 # Bypass hooks for emergency commits (not recommended)
 git commit --no-verify
@@ -50,16 +58,16 @@ git commit --no-verify
 - **Line length**: 120 characters
 - **Multi-line output**: Mode 3 (Hanging Grid Grouped)
 
-### pytest Test Runner
-- **Command**: `PYTHONPATH=. pytest tests/ -v --tb=short`
-- **Environment**: Uses activated virtual environment
+### pytest Test Runner (Docker Compose)
+- **Command**: `docker compose --profile test run --rm backend-test`
+- **Environment**: Uses Docker containers with proper service dependencies (NATS, etc.)
 - **Coverage**: All tests must pass
 
 ## What Happens on Commit
 
 1. **Black** formats your Python code
 2. **isort** organizes your imports
-3. **pytest** runs all tests
+3. **pytest** runs all tests using Docker Compose
 4. If any step fails, the commit is blocked
 5. You fix the issues and commit again
 
@@ -69,7 +77,8 @@ git commit --no-verify
 - **Automatic import organization** 
 - **Prevents broken code** from being committed
 - **Reduces code review time** by handling formatting automatically
-- **Uses project's virtual environment** and uv package manager
+- **Docker-based testing** ensures consistent environment with proper service dependencies
+- **Isolated test environment** prevents conflicts with local development setup
 
 ## Troubleshooting
 
@@ -79,8 +88,14 @@ Make sure you ran the setup script: `./setup-pre-commit.sh`
 ### Tests fail during commit
 Fix the failing tests before committing. You can run tests manually:
 ```bash
-cd backend && source .venv/bin/activate && PYTHONPATH=. pytest tests/ -v
+docker compose --profile test run --rm backend-test
 ```
+
+### Docker issues
+If Docker-related commands fail:
+- Ensure Docker is running: `docker ps`
+- Build the images: `docker compose build backend`
+- Check Docker Compose version: `docker compose version`
 
 ### Emergency bypass
 Only use in emergencies:
