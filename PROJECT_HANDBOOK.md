@@ -151,6 +151,7 @@ quickfix-ssl==1.15.1
 - [x] Historical bar data parsing and validation
 - [x] **QuickFIX configuration management with external .cfg files**
 - [x] **Process lifecycle management and monitoring**
+- [x] **CFD leverage information in instruments endpoint** (margin calculation modes, leverage ratios)
 
 ### 🚧 Current Work
 - [ ] Testing the new QuickFIX architecture with real FIX credentials
@@ -349,6 +350,9 @@ Authorization: Bearer <jwt_token>
       "swap_size_short": "-0.002531",
       "swap_size_long": "-0.003591",
       "margin_factor_fractional": "1.0",
+      "margin_calc_mode": "FOREX",
+      "margin_hedge": "0.5",
+      "margin_factor": "100",
       "default_slippage": "200",
       "status_group_id": "Forex"
     }
@@ -357,6 +361,19 @@ Authorization: Bearer <jwt_token>
   "timestamp": "2023-12-01T10:30:00Z"
 }
 ```
+
+**CFD Leverage Information:**
+The response includes comprehensive margin and leverage information for CFD instruments:
+
+- `margin_calc_mode`: Mode of margin calculation (FOREX, CFD, FUTURES, CFD_INDEX, CFD_LEVERAGE)
+- `margin_factor_fractional`: Fractional margin factor for leverage calculation (e.g., "1.0" = 1:1, "0.01" = 1:100 leverage)
+- `margin_hedge`: Factor for calculating margin on hedged positions (typically lower than full margin)
+- `margin_factor`: Integer representation of margin factor
+
+For CFD instruments, leverage can be calculated as `1 / margin_factor_fractional`. For example:
+- `margin_factor_fractional: "0.01"` = 1:100 leverage (1% margin requirement)
+- `margin_factor_fractional: "0.05"` = 1:20 leverage (5% margin requirement)
+- `margin_factor_fractional: "1.0"` = 1:1 leverage (100% margin requirement)
 
 #### POST /market/history
 Get historical price bars for a specified symbol and time period via FIX Market Data History Request.

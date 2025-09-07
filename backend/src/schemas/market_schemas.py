@@ -31,6 +31,7 @@ class SecurityInfo(BaseModel):
 
     # Commission and fees
     commission: Optional[str] = Field(None, description="Commission value")
+    limits_commission: Optional[str] = Field(None, description="Limits commission value")
     comm_type: Optional[str] = Field(None, description="Commission type")
     comm_charge_type: Optional[str] = Field(None, description="Commission charge type")
     comm_charge_method: Optional[str] = Field(None, description="Commission charge method")
@@ -44,7 +45,15 @@ class SecurityInfo(BaseModel):
     triple_swap_day: Optional[str] = Field(None, description="Day of week for triple swap")
 
     # Margin and risk
-    margin_factor_fractional: Optional[str] = Field(None, description="Margin factor")
+    profit_calc_mode: Optional[str] = Field(
+        None, description="Mode of profit calculation (FOREX, CFD, FUTURES, CFD_INDEX, CFD_LEVERAGE)"
+    )
+    margin_factor_fractional: Optional[str] = Field(None, description="Margin factor (fractional)")
+    margin_calc_mode: Optional[str] = Field(
+        None, description="Mode of margin calculation (FOREX, CFD, FUTURES, CFD_INDEX, CFD_LEVERAGE)"
+    )
+    margin_hedge: Optional[str] = Field(None, description="Factor for calculating margin for hedged orders/positions")
+    margin_factor: Optional[str] = Field(None, description="Integer margin factor")
     stop_order_margin_reduction: Optional[str] = Field(None, description="Stop order margin reduction")
     hidden_limit_order_margin_reduction: Optional[str] = Field(None, description="Hidden limit order margin reduction")
 
@@ -52,11 +61,12 @@ class SecurityInfo(BaseModel):
     description_len: Optional[str] = Field(None, description="Description length")
     encoded_security_desc_len: Optional[str] = Field(None, description="Encoded security description length")
     encoded_security_desc: Optional[str] = Field(None, description="Encoded security description")
+    color_ref: Optional[str] = Field(None, description="Symbol color reference (Win32 COLORREF format)")
     default_slippage: Optional[str] = Field(None, description="Default slippage")
     sort_order: Optional[str] = Field(None, description="Sort order")
     group_sort_order: Optional[str] = Field(None, description="Group sort order")
     status_group_id: Optional[str] = Field(None, description="Status group ID")
-    close_only: Optional[str] = Field(None, description="Close only flag")
+    close_only: Optional[bool] = Field(None, description="Close only flag")
 
 
 class SecurityListResponse(BaseModel):

@@ -43,7 +43,7 @@ class FIXMessageParser:
         10155: "default_slippage",
         354: "encoded_text_len",
         355: "description",
-        10134: "trade_enabled",
+        10134: "margin_factor_fractional",
     }
 
     MARKET_HISTORY_FIELD_MAPPINGS = {

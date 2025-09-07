@@ -802,15 +802,37 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
                     10057: "px_precision",
                     231: "contract_multiplier",
                     10137: "currency_precision",
+                    10135: "currency_sort_order",
                     10138: "settl_currency_precision",
+                    10136: "settl_currency_sort_order",
+                    # Margin and risk fields
+                    10059: "profit_calc_mode",
                     10134: "margin_factor_fractional",
+                    10060: "margin_calc_mode",
+                    10061: "margin_hedge",
+                    10063: "margin_factor",
+                    10194: "stop_order_margin_reduction",
+                    10209: "hidden_limit_order_margin_reduction",
+                    # Commission fields
                     12: "commission",
+                    10123: "limits_commission",
                     13: "comm_type",
+                    10124: "comm_charge_type",
+                    10143: "comm_charge_method",
+                    10210: "min_commission",
+                    10211: "min_commission_currency",
+                    # Swap fields
                     10212: "swap_type",
                     10125: "swap_size_short",
                     10126: "swap_size_long",
+                    10213: "triple_swap_day",
+                    # Display and grouping
+                    10067: "color_ref",
                     10155: "default_slippage",
+                    10131: "sort_order",
+                    10132: "group_sort_order",
                     10170: "status_group_id",
+                    10243: "close_only",
                 }
 
                 for tag, field_name in field_mappings.items():
@@ -819,7 +841,7 @@ class QuickFIXFeedAdapter(QuickFIXBaseAdapter):
                         group.getField(field)
                         value = field.getValue()
 
-                        if field_name == "trade_enabled":
+                        if field_name in ["trade_enabled", "close_only"]:
                             symbol_data[field_name] = value == "Y"
                         else:
                             symbol_data[field_name] = value

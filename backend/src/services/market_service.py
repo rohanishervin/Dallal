@@ -63,6 +63,7 @@ class MarketService:
                             settl_currency_sort_order=symbol_data.get("settl_currency_sort_order"),
                             # Commission and fees
                             commission=symbol_data.get("commission"),
+                            limits_commission=symbol_data.get("limits_commission"),
                             comm_type=symbol_data.get("comm_type"),
                             comm_charge_type=symbol_data.get("comm_charge_type"),
                             comm_charge_method=symbol_data.get("comm_charge_method"),
@@ -74,13 +75,18 @@ class MarketService:
                             swap_size_long=symbol_data.get("swap_size_long"),
                             triple_swap_day=symbol_data.get("triple_swap_day"),
                             # Margin and risk
+                            profit_calc_mode=symbol_data.get("profit_calc_mode"),
                             margin_factor_fractional=symbol_data.get("margin_factor_fractional"),
+                            margin_calc_mode=symbol_data.get("margin_calc_mode"),
+                            margin_hedge=symbol_data.get("margin_hedge"),
+                            margin_factor=symbol_data.get("margin_factor"),
                             stop_order_margin_reduction=symbol_data.get("stop_order_margin_reduction"),
                             hidden_limit_order_margin_reduction=symbol_data.get("hidden_limit_order_margin_reduction"),
                             # Display and grouping
                             description_len=symbol_data.get("description_len"),
                             encoded_security_desc_len=symbol_data.get("encoded_security_desc_len"),
                             encoded_security_desc=symbol_data.get("encoded_security_desc"),
+                            color_ref=symbol_data.get("color_ref"),
                             default_slippage=symbol_data.get("default_slippage"),
                             sort_order=symbol_data.get("sort_order"),
                             group_sort_order=symbol_data.get("group_sort_order"),
