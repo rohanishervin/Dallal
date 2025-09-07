@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -5,7 +6,10 @@ from typing import Optional, Tuple
 from jose import jwt
 
 from src.config.settings import config
+from src.services.account_service import account_service
 from src.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -37,6 +41,15 @@ class AuthService:
 
             if trade_session and feed_session:
                 token = self.generate_token(username)
+
+                # Fetch and cache account info after successful login
+                try:
+                    await account_service.get_account_info(user_id, force_refresh=True)
+                    logger.info(f"Successfully cached account info for user {user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to cache account info for user {user_id}: {str(e)}")
+                    # Don't fail login if account info fetch fails
+
                 return True, token, None
             else:
                 return False, None, "Authentication failed"

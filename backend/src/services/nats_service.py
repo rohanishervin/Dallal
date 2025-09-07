@@ -131,6 +131,44 @@ class NATSService:
             logger.error(f"Failed to publish heartbeat for process {process_id}: {e}")
             return False
 
+    async def store_account_data(self, user_id: str, account_data: dict) -> bool:
+        """Store account data for a user"""
+        if not self.nc or not self.connected:
+            logger.error("NATS not connected, cannot store account data")
+            return False
+
+        try:
+            subject = config.nats.account_subject.format(user_id=user_id)
+            payload = json.dumps(account_data, default=str)
+            await self.nc.publish(subject, payload.encode())
+            logger.debug(f"Stored account data for user {user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store account data for user {user_id}: {e}")
+            return False
+
+    async def get_account_data(self, user_id: str) -> Optional[dict]:
+        """Retrieve account data for a user from in-memory cache"""
+        # For now, we'll use a simple in-memory approach since NATS KV might not be available
+        # In a production environment, you might want to use NATS KV or Redis
+        if not hasattr(self, "_account_cache"):
+            self._account_cache = {}
+
+        return self._account_cache.get(user_id)
+
+    async def store_account_data(self, user_id: str, account_data: dict) -> bool:
+        """Store account data for a user in in-memory cache"""
+        if not hasattr(self, "_account_cache"):
+            self._account_cache = {}
+
+        try:
+            self._account_cache[user_id] = account_data
+            logger.debug(f"Stored account data for user {user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store account data for user {user_id}: {e}")
+            return False
+
     async def _error_callback(self, e):
         logger.error(f"NATS error: {e}")
 

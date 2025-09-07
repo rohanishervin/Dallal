@@ -163,6 +163,55 @@ class TestMarketEndpoints:
             print(f"EUR/USD instrument data: {eurusd}")
 
     @pytest.mark.asyncio
+    async def test_symbol_leverage_calculation(self):
+        """Test that symbol_leverage field is calculated correctly"""
+        token = await self.get_auth_token()
+
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await client.get("/market/instruments", headers={"Authorization": f"Bearer {token}"})
+
+            assert response.status_code == 200
+            data = response.json()
+
+            instruments = data["symbols"]
+            assert len(instruments) > 0
+
+            # Check that symbol_leverage field exists and is calculated properly
+            for instrument in instruments:
+                assert "symbol_leverage" in instrument, f"Missing symbol_leverage field in {instrument['symbol']}"
+
+                margin_calc_mode = instrument.get("margin_calc_mode", "").lower()
+                margin_factor_fractional = instrument.get("margin_factor_fractional")
+                symbol_leverage = instrument["symbol_leverage"]
+
+                if margin_calc_mode == "c":
+                    # CFD: leverage should be 1 / margin_factor_fractional
+                    if margin_factor_fractional and symbol_leverage:
+                        try:
+                            expected_leverage = 1.0 / float(margin_factor_fractional)
+                            assert (
+                                abs(symbol_leverage - expected_leverage) < 0.001
+                            ), f"CFD leverage mismatch for {instrument['symbol']}: expected {expected_leverage}, got {symbol_leverage}"
+                        except (ValueError, ZeroDivisionError):
+                            pass  # Skip invalid values
+                elif margin_calc_mode == "f" or margin_calc_mode == "l":
+                    # FOREX/Leverage: leverage should be account leverage (if available)
+                    if symbol_leverage:
+                        assert isinstance(
+                            symbol_leverage, (int, float)
+                        ), f"FOREX/Leverage leverage should be numeric for {instrument['symbol']}"
+                        assert (
+                            symbol_leverage > 0
+                        ), f"FOREX/Leverage leverage should be positive for {instrument['symbol']}"
+                else:
+                    # Other: leverage should be None
+                    assert (
+                        symbol_leverage is None
+                    ), f"Leverage should be None for unsupported margin_calc_mode {margin_calc_mode} in {instrument['symbol']}"
+
+            print(f"Verified symbol_leverage calculation for {len(instruments)} instruments")
+
+    @pytest.mark.asyncio
     async def test_instruments_field_completeness(self):
         """Test that most instruments have the majority of fields populated"""
         token = await self.get_auth_token()

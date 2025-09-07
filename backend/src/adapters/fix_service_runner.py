@@ -120,6 +120,8 @@ class FIXServiceProcess:
                     self._handle_security_list_request(request_id, request_data)
                 elif request_type == "market_history":
                     self._handle_market_history_request(request_id, request_data)
+                elif request_type == "account_info":
+                    self._handle_account_info_request(request_id, request_data)
                 elif request_type == "heartbeat":
                     self._handle_heartbeat_request(request_id)
                 elif request_type == "test_request":
@@ -203,6 +205,36 @@ class FIXServiceProcess:
 
         except Exception as e:
             self._send_error_response(request_id, f"Market history error: {e}")
+
+    def _handle_account_info_request(self, request_id: str, request_data: dict):
+        """Handle account info request"""
+        try:
+            if not self.adapter or not self.adapter.is_connected():
+                self._send_error_response(request_id, "FIX session not connected")
+                return
+
+            if self.connection_type != "trade":
+                self._send_error_response(request_id, "Account info requests only available on trade connection")
+                return
+
+            # Extract request_id from request data if provided
+            account_request_id = request_data.get("request_id")
+
+            success, data, error = self.adapter.send_account_info_request(account_request_id)
+
+            self.response_queue.put(
+                {
+                    "request_id": request_id,
+                    "type": "account_info_response",
+                    "success": success,
+                    "data": data,
+                    "error": error,
+                    "timestamp": time.time(),
+                }
+            )
+
+        except Exception as e:
+            self._send_error_response(request_id, f"Account info error: {e}")
 
     def _handle_heartbeat_request(self, request_id: str):
         """Handle heartbeat request"""

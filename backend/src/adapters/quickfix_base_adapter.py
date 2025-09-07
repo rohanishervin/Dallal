@@ -420,3 +420,41 @@ class QuickFIXBaseAdapter(fix.Application):
         except Exception as e:
             logger.error(f"Market history request failed: {e}")
             return False, None, f"Request failed: {e}"
+
+    def send_account_info_request(self, request_id: str = None) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send Account Info Request (U1005) to get account information including leverage"""
+        if not self.is_connected():
+            return False, None, "Session not connected"
+
+        try:
+            if request_id is None:
+                request_id = f"AIR_{int(time.time() * 1000)}"
+
+            message = fix.Message()
+            header = message.getHeader()
+            header.setField(fix.MsgType("U1005"))
+
+            # AcInfReqID (10028) - required field
+            message.setField(fix.StringField(10028, request_id))
+
+            event = threading.Event()
+            self.request_responses[request_id] = None
+            self.response_events[request_id] = event
+
+            success = self.send_message(message)
+            if success:
+                logger.info(f"Sent Account Info Request: {request_id}")
+                if event.wait(30):
+                    response = self.request_responses.get(request_id)
+                    if response:
+                        return True, response, None
+                    else:
+                        return False, None, "No response received"
+                else:
+                    return False, None, "Request timeout"
+            else:
+                return False, None, "Failed to send request"
+
+        except Exception as e:
+            logger.error(f"Account info request failed: {e}")
+            return False, None, f"Request failed: {e}"

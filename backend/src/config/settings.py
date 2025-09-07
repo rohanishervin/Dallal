@@ -59,6 +59,7 @@ class NATSConfig:
         self.orderbook_subject = "orderbook.{symbol}"
         self.session_subject = "session.{user_id}"
         self.heartbeat_subject = "heartbeat.{process_id}"
+        self.account_subject = "account.{user_id}"
 
 
 class AppConfig:

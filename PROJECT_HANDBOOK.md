@@ -583,7 +583,8 @@ Authorization: Bearer <jwt_token>
       "margin_hedge": "0.5",
       "margin_factor": "100",
       "default_slippage": "200",
-      "status_group_id": "Forex"
+      "status_group_id": "Forex",
+      "symbol_leverage": 400.0
     }
   ],
   "message": "Retrieved 314 trading instruments",
@@ -601,8 +602,19 @@ The response includes comprehensive margin and leverage information for CFD inst
 
 For CFD instruments, leverage can be calculated as `1 / margin_factor_fractional`. For example:
 - `margin_factor_fractional: "0.01"` = 1:100 leverage (1% margin requirement)
-- `margin_factor_fractional: "0.05"` = 1:20 leverage (5% margin requirement)
-- `margin_factor_fractional: "1.0"` = 1:1 leverage (100% margin requirement)
+
+**Symbol Leverage Calculation:**
+The response now includes a `symbol_leverage` field that is calculated automatically based on the following logic:
+
+- **CFD instruments** (`margin_calc_mode` = "c"): `symbol_leverage = 1 / margin_factor_fractional`
+  - Example: For BTC/USD with `margin_factor_fractional: "0.2"`, leverage = 1/0.2 = 5
+- **FOREX instruments** (`margin_calc_mode` = "f"): `symbol_leverage = account_leverage`
+  - Example: For EUR/USD with account leverage 400, leverage = 400
+- **Leverage instruments** (`margin_calc_mode` = "l"): `symbol_leverage = account_leverage`
+  - Example: For instruments with leverage mode and account leverage 400, leverage = 400
+- **Other instruments**: `symbol_leverage = null`
+
+The account leverage is automatically fetched and cached upon login using the FIX Account Info Request (U1005).
 
 #### POST /market/history
 Get historical price bars for a specified symbol and time period via FIX Market Data History Request.

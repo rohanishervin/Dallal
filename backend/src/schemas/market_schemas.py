@@ -68,6 +68,11 @@ class SecurityInfo(BaseModel):
     status_group_id: Optional[str] = Field(None, description="Status group ID")
     close_only: Optional[bool] = Field(None, description="Close only flag")
 
+    # Calculated fields
+    symbol_leverage: Optional[float] = Field(
+        None, description="Symbol leverage calculated based on margin_calc_mode and account leverage"
+    )
+
 
 class SecurityListResponse(BaseModel):
     success: bool = Field(..., description="Whether the request was successful")

@@ -11,6 +11,7 @@ from src.schemas.market_schemas import (
     SecurityInfo,
     SecurityListResponse,
 )
+from src.services.account_service import account_service
 from src.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,72 @@ logger = logging.getLogger(__name__)
 class MarketService:
     def __init__(self):
         pass
+
+    def _calculate_symbol_leverage(self, symbol_data: dict, account_leverage: Optional[float]) -> Optional[float]:
+        """
+        Calculate symbol leverage based on margin_calc_mode and account leverage.
+
+        Business Logic:
+        - If margin_calc_mode = "c": leverage = 1 / margin_factor_fractional
+        - If margin_calc_mode = "f": leverage = account_leverage
+        - If margin_calc_mode = "l": leverage = account_leverage
+        - Otherwise: return None
+        """
+        try:
+            margin_calc_mode = symbol_data.get("margin_calc_mode", "").lower()
+            margin_factor_fractional_str = symbol_data.get("margin_factor_fractional")
+
+            if not margin_calc_mode:
+                logger.debug("No margin_calc_mode found for symbol")
+                return None
+
+            # CFD case: leverage = 1 / margin_factor_fractional
+            if margin_calc_mode == "c":
+                if margin_factor_fractional_str:
+                    try:
+                        margin_factor_fractional = float(margin_factor_fractional_str)
+                        if margin_factor_fractional > 0:
+                            leverage = 1.0 / margin_factor_fractional
+                            logger.debug(f"CFD leverage calculated: {leverage} (1/{margin_factor_fractional})")
+                            return leverage
+                        else:
+                            logger.warning(f"Invalid margin_factor_fractional for CFD: {margin_factor_fractional}")
+                            return None
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Could not parse margin_factor_fractional for CFD: {margin_factor_fractional_str}"
+                        )
+                        return None
+                else:
+                    logger.debug("No margin_factor_fractional found for CFD symbol")
+                    return None
+
+            # FOREX case: leverage = account_leverage
+            elif margin_calc_mode == "f":
+                if account_leverage is not None:
+                    logger.debug(f"FOREX leverage from account: {account_leverage}")
+                    return account_leverage
+                else:
+                    logger.debug("No account leverage available for FOREX symbol")
+                    return None
+
+            # Leverage case: leverage = account_leverage (same as FOREX)
+            elif margin_calc_mode == "l":
+                if account_leverage is not None:
+                    logger.debug(f"Leverage mode leverage from account: {account_leverage}")
+                    return account_leverage
+                else:
+                    logger.debug("No account leverage available for leverage mode symbol")
+                    return None
+
+            # Other cases: return None
+            else:
+                logger.debug(f"Unsupported margin_calc_mode for leverage calculation: {margin_calc_mode}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error calculating symbol leverage: {str(e)}")
+            return None
 
     async def get_security_list(self, user_id: str, request_id: Optional[str] = None) -> SecurityListResponse:
         try:
@@ -32,6 +99,39 @@ class MarketService:
                     error="Feed session not available",
                     symbols=[],
                 )
+
+            # Get account leverage for leverage calculations
+            account_info = await account_service.get_account_info(user_id)
+            logger.debug(f"Account info type: {type(account_info)}, value: {account_info}")
+
+            account_leverage = None
+            if account_info:
+                if isinstance(account_info, dict):
+                    leverage_str = account_info.get("leverage")
+                    if leverage_str:
+                        try:
+                            account_leverage = float(leverage_str)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert leverage to float: {leverage_str}")
+                            account_leverage = None
+                elif isinstance(account_info, tuple) and len(account_info) >= 2:
+                    # Handle case where account_info is a tuple (success, data, error)
+                    success, data, error = account_info
+                    if success and isinstance(data, dict):
+                        leverage_str = data.get("leverage")
+                        if leverage_str:
+                            try:
+                                account_leverage = float(leverage_str)
+                            except (ValueError, TypeError):
+                                logger.warning(f"Could not convert leverage to float: {leverage_str}")
+                                account_leverage = None
+                    logger.warning(
+                        f"Account service returned tuple instead of dict, extracted leverage: {account_leverage}"
+                    )
+                else:
+                    logger.error(f"Expected dict for account_info, got {type(account_info)}: {account_info}")
+
+            logger.debug(f"Account leverage for user {user_id}: {account_leverage}")
 
             success, response_data, error_message = await session.send_security_list_request(request_id)
 
@@ -92,6 +192,8 @@ class MarketService:
                             group_sort_order=symbol_data.get("group_sort_order"),
                             status_group_id=symbol_data.get("status_group_id"),
                             close_only=symbol_data.get("close_only"),
+                            # Calculated fields
+                            symbol_leverage=self._calculate_symbol_leverage(symbol_data, account_leverage),
                         )
                     )
 

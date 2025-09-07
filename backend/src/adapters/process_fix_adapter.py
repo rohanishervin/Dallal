@@ -105,6 +105,24 @@ class ProcessFIXAdapter:
             logger.error(f"Market history request error: {e}")
             return False, None, f"Request error: {e}"
 
+    async def send_account_info_request(self, request_id: str = None) -> Tuple[bool, Optional[dict], Optional[str]]:
+        """Send account info request via process communication"""
+        if not self.process_id:
+            return False, None, "No active FIX process"
+
+        try:
+            request_data = {"request_id": request_id}
+
+            success, data, error = await fix_process_manager.send_request(
+                self.process_id, "account_info", request_data, timeout=15
+            )
+
+            return success, data, error
+
+        except Exception as e:
+            logger.error(f"Account info request error: {e}")
+            return False, None, f"Request error: {e}"
+
     async def send_market_data_request(self, symbol: str, md_req_id: str = None) -> Tuple[bool, Optional[str]]:
         """Send market data request via process communication (feed only)"""
         if not self.process_id:

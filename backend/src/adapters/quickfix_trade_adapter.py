@@ -44,6 +44,8 @@ class QuickFIXTradeAdapter(QuickFIXBaseAdapter):
             self._handle_business_message_reject(message)
         elif msg_type_str == "U1001":
             self._handle_market_history_reject(message)
+        elif msg_type_str == "U1006":
+            self._handle_account_info_response(message)
         elif msg_type_str == "8":
             self._handle_execution_report(message)
         elif msg_type_str == "9":
@@ -138,6 +140,81 @@ class QuickFIXTradeAdapter(QuickFIXBaseAdapter):
                 self.response_events[request_id].set()
         except Exception as e:
             logger.error(f"Error handling market history reject: {e}")
+
+    def _handle_account_info_response(self, message):
+        """Handle Account Info response (U1006)"""
+        try:
+            request_id = ""
+            if message.isSetField(10028):
+                request_id_field = fix.StringField(10028)
+                message.getField(request_id_field)
+                request_id = request_id_field.getValue()
+
+            parsed_data = self._parse_account_info_message(message)
+
+            if request_id in self.response_events:
+                self.request_responses[request_id] = (True, parsed_data, None)
+                self.response_events[request_id].set()
+        except Exception as e:
+            logger.error(f"Error handling account info response: {e}")
+
+    def _parse_account_info_message(self, message) -> dict:
+        """Parse Account Info (U1006) message"""
+        try:
+            account_info = {}
+
+            # Required fields
+            if message.isSetField(10029):  # Leverage
+                leverage_field = fix.StringField(10029)
+                message.getField(leverage_field)
+                account_info["leverage"] = leverage_field.getValue()
+
+            if message.isSetField(10031):  # Balance
+                balance_field = fix.StringField(10031)
+                message.getField(balance_field)
+                account_info["balance"] = balance_field.getValue()
+
+            if message.isSetField(10030):  # Margin
+                margin_field = fix.StringField(10030)
+                message.getField(margin_field)
+                account_info["margin"] = margin_field.getValue()
+
+            if message.isSetField(10032):  # Equity
+                equity_field = fix.StringField(10032)
+                message.getField(equity_field)
+                account_info["equity"] = equity_field.getValue()
+
+            if message.isSetField(15):  # Currency
+                currency_field = fix.Currency()
+                message.getField(currency_field)
+                account_info["currency"] = currency_field.getValue()
+
+            if message.isSetField(1):  # Account
+                account_field = fix.Account()
+                message.getField(account_field)
+                account_info["account"] = account_field.getValue()
+
+            # Optional fields
+            if message.isSetField(10033):  # AccountingType
+                accounting_type_field = fix.StringField(10033)
+                message.getField(accounting_type_field)
+                account_info["accounting_type"] = accounting_type_field.getValue()
+
+            if message.isSetField(10112):  # AccountName
+                account_name_field = fix.StringField(10112)
+                message.getField(account_name_field)
+                account_info["account_name"] = account_name_field.getValue()
+
+            if message.isSetField(10028):  # AcInfReqID
+                request_id_field = fix.StringField(10028)
+                message.getField(request_id_field)
+                account_info["request_id"] = request_id_field.getValue()
+
+            return account_info
+
+        except Exception as e:
+            logger.error(f"Error parsing account info message: {e}")
+            return {"error": f"Failed to parse account info message: {e}"}
 
     def send_security_list_request(self, request_id: str = None) -> Tuple[bool, Optional[dict], Optional[str]]:
         if not self.is_connected():
